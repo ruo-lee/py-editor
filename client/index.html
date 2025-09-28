@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python IDE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            overflow: hidden;
+        }
+
+        #app {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 40px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            font-weight: 500;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            height: 35px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #cccccc;
+            background: #2d2d30;
+        }
+
+        .file-explorer {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .editor-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .tab-bar {
+            height: 35px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+        }
+
+        .tab {
+            height: 35px;
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            background: #1e1e1e;
+            border-right: 1px solid #3e3e42;
+            cursor: pointer;
+            font-size: 13px;
+            position: relative;
+        }
+
+        .tab.active {
+            background: #1e1e1e;
+        }
+
+        .tab:hover {
+            background: #2a2d2e;
+        }
+
+        .tab-close {
+            margin-left: 8px;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .tab:hover .tab-close {
+            opacity: 1;
+        }
+
+        .tab-close:hover {
+            background: #3e3e42;
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+            min-height: 400px;
+        }
+
+        #editor {
+            height: 100%;
+            width: 100%;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .file-item:hover {
+            background: #2a2d2e;
+        }
+
+        .file-item.selected {
+            background: #37373d;
+        }
+
+        .file-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+
+        .folder-item {
+            padding-left: 10px;
+        }
+
+        .folder-content {
+            padding-left: 20px;
+        }
+
+        .folder-toggle {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
+            color: #858585;
+        }
+
+        .error {
+            color: #f14c4c;
+            padding: 10px;
+        }
+
+        .execute-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 1000;
+        }
+
+        .execute-button:hover {
+            background: #1177bb;
+        }
+
+        .output-panel {
+            height: 200px;
+            background: #1e1e1e;
+            border-top: 1px solid #3e3e42;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            flex-shrink: 0;
+        }
+
+        .output-panel.error {
+            color: #f14c4c;
+        }
+
+        .explorer-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            background: #2d2d30;
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            color: #cccccc;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 3px;
+            font-size: 16px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-button:hover {
+            background: #3e3e42;
+            color: #ffffff;
+        }
+
+        .context-menu {
+            position: absolute;
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            padding: 4px 0;
+            z-index: 1000;
+            min-width: 150px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .context-menu-item {
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #cccccc;
+        }
+
+        .context-menu-item:hover {
+            background: #3e3e42;
+        }
+
+        .input-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .input-dialog-content {
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 6px;
+            padding: 20px;
+            min-width: 300px;
+        }
+
+        .input-dialog h3 {
+            margin: 0 0 15px 0;
+            color: #ffffff;
+            font-size: 16px;
+        }
+
+        .input-dialog input {
+            width: 100%;
+            padding: 8px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            color: #d4d4d4;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .input-dialog input:focus {
+            outline: none;
+            border-color: #0e639c;
+        }
+
+        .input-dialog-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .dialog-button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .dialog-button.primary {
+            background: #0e639c;
+            color: white;
+        }
+
+        .dialog-button.primary:hover {
+            background: #1177bb;
+        }
+
+        .dialog-button.secondary {
+            background: #3e3e42;
+            color: #cccccc;
+        }
+
+        .dialog-button.secondary:hover {
+            background: #5a5a5a;
+        }
+
+        .highlight-definition {
+            background-color: rgba(255, 255, 0, 0.2);
+            border: 1px solid rgba(255, 255, 0, 0.4);
+        }
+
+        /* Ctrl+hover link styling */
+        .monaco-editor .ctrl-hover-link {
+            color: #4FC3F7 !important;
+            text-decoration: underline !important;
+            cursor: pointer !important;
+        }
+
+        .monaco-editor .view-line span:hover {
+            transition: color 0.1s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <span>🐍 Python IDE</span>
+        </div>
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="explorer-actions">
+                    <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #cccccc;">Explorer</span>
+                    <div>
+                        <button class="action-button" id="newFileBtn" title="New File">📄</button>
+                        <button class="action-button" id="newFolderBtn" title="New Folder">📁</button>
+                        <button class="action-button" id="refreshBtn" title="Refresh">🔄</button>
+                    </div>
+                </div>
+                <div class="file-explorer" id="fileExplorer">
+                    <div class="loading">Loading files...</div>
+                </div>
+            </div>
+            <div class="editor-area">
+                <div class="tab-bar" id="tabBar"></div>
+                <div class="editor-container">
+                    <div id="editor"></div>
+                    <button class="execute-button" id="executeButton" style="display: none;">Run</button>
+                </div>
+                <div class="output-panel" id="outputPanel" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
