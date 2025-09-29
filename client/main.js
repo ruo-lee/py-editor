@@ -70,17 +70,52 @@ class PythonIDE {
             this.handleMouseMove(e);
         });
 
-        // Track key states
+        // Clear link decorations when mouse leaves editor
+        this.editor.onMouseLeave(() => {
+            this.clearLinkDecorations();
+        });
+
+        // Monaco Editor keyboard events (support Mac Cmd key)
+        this.editor.onKeyDown((e) => {
+            console.log('Monaco keydown:', e.keyCode, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
+            const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
+            if (isModifierPressed || e.ctrlKey || e.metaKey) {
+                console.log('Monaco detected modifier key, setting ctrlPressed to true');
+                this.ctrlPressed = true;
+                this.updateCursorStyle();
+            }
+        });
+
+        this.editor.onKeyUp((e) => {
+            console.log('Monaco keyup:', e.keyCode, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
+            const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
+            if (!isModifierPressed && !e.ctrlKey && !e.metaKey) {
+                console.log('Monaco detected modifier release, setting ctrlPressed to false');
+                this.ctrlPressed = false;
+                this.updateCursorStyle();
+                this.clearLinkDecorations();
+            }
+        });
+
+        // Track key states (support both Ctrl and Cmd)
         this.ctrlPressed = false;
+        this.isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
         document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
+            console.log('keydown event:', e.key, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey, 'platform:', navigator.platform);
+            const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
+            if (isModifierPressed || e.ctrlKey || e.metaKey) {
+                console.log('Setting ctrlPressed to true');
                 this.ctrlPressed = true;
                 this.updateCursorStyle();
             }
         });
 
         document.addEventListener('keyup', (e) => {
-            if (!e.ctrlKey && !e.metaKey) {
+            console.log('keyup event:', e.key, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
+            const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
+            if (!isModifierPressed && !e.ctrlKey && !e.metaKey) {
+                console.log('Setting ctrlPressed to false');
                 this.ctrlPressed = false;
                 this.updateCursorStyle();
                 this.clearLinkDecorations();
@@ -706,8 +741,19 @@ class PythonIDE {
     }
 
     handleMouseMove(e) {
-        if (this.ctrlPressed && e.target.position) {
-            this.showLinkAtPosition(e.target.position);
+        console.log('handleMouseMove - ctrlPressed:', this.ctrlPressed, 'event:', e);
+        if (this.ctrlPressed) {
+            // Get the position from Monaco's mouse event
+            const position = e.target ? e.target.position : null;
+            console.log('Position from event:', position);
+            if (position) {
+                this.showLinkAtPosition(position);
+            } else {
+                console.log('No position found, clearing decorations');
+                this.clearLinkDecorations();
+            }
+        } else {
+            this.clearLinkDecorations();
         }
     }
 
@@ -723,10 +769,15 @@ class PythonIDE {
     }
 
     showLinkAtPosition(position) {
+        console.log('showLinkAtPosition called:', position);
         const model = this.editor.getModel();
-        if (!model) return;
+        if (!model) {
+            console.log('No model found');
+            return;
+        }
 
         const word = model.getWordAtPosition(position);
+        console.log('Word at position:', word);
         if (!word) {
             this.clearLinkDecorations();
             return;
@@ -734,7 +785,9 @@ class PythonIDE {
 
         // Check if this is a linkable element (variable, function, import)
         const line = model.getLineContent(position.lineNumber);
+        console.log('Line content:', line);
         const isLinkable = this.isLinkableElement(line, word.word, position);
+        console.log('Is linkable:', isLinkable);
 
         if (isLinkable) {
             const range = {
@@ -744,6 +797,7 @@ class PythonIDE {
                 endColumn: word.endColumn
             };
 
+            console.log('Applying decoration to range:', range);
             this.currentLinkDecorations = this.editor.deltaDecorations(
                 this.currentLinkDecorations || [],
                 [{
@@ -754,6 +808,7 @@ class PythonIDE {
                     }
                 }]
             );
+            console.log('Applied decorations:', this.currentLinkDecorations);
         } else {
             this.clearLinkDecorations();
         }
@@ -867,28 +922,33 @@ class PythonIDE {
                 element.setAttribute('data-path', item.path);
                 element.setAttribute('data-type', 'directory');
                 element.innerHTML = `
-                    <span class="folder-toggle">▶</span>
+                    <span class="folder-toggle">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M6 4l4 4-4 4V4z"/>
+                        </svg>
+                    </span>
                     <span class="file-icon">📁</span>
                     <span>${item.name}</span>
                 `;
 
                 const content = document.createElement('div');
                 content.className = 'folder-content';
-                content.style.display = 'none';
 
                 // Directory toggle functionality
                 const toggle = element.querySelector('.folder-toggle');
                 toggle.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (content.style.display === 'none') {
-                        content.style.display = 'block';
-                        toggle.textContent = '▼';
+                    const isExpanded = content.classList.contains('expanded');
+
+                    if (!isExpanded) {
+                        content.classList.add('expanded');
+                        toggle.classList.add('expanded');
                         if (content.children.length === 0) {
                             this.renderFileExplorer(item.children, content, level + 1);
                         }
                     } else {
-                        content.style.display = 'none';
-                        toggle.textContent = '▶';
+                        content.classList.remove('expanded');
+                        toggle.classList.remove('expanded');
                     }
                 });
 
@@ -1033,7 +1093,9 @@ class PythonIDE {
     getLanguageFromFile(filepath) {
         const ext = filepath.split('.').pop()?.toLowerCase();
         switch (ext) {
-            case 'py': return 'python';
+            case 'py':
+            case 'pyi': // Python stub files
+                return 'python';
             case 'js': return 'javascript';
             case 'json': return 'json';
             case 'html': return 'html';
@@ -1245,6 +1307,15 @@ class PythonIDE {
         // Close context menu on click outside
         document.addEventListener('click', () => {
             this.closeContextMenu();
+        });
+
+        // File explorer empty space context menu
+        this.fileExplorer.addEventListener('contextmenu', (e) => {
+            // Check if the right-click is on empty space (not on a file/folder item)
+            if (e.target === this.fileExplorer || e.target.closest('.file-item') === null) {
+                e.preventDefault();
+                this.showEmptySpaceContextMenu(e);
+            }
         });
     }
 
@@ -1474,6 +1545,47 @@ class PythonIDE {
             } else {
                 const menuItem = document.createElement('div');
                 menuItem.className = `context-menu-item ${item.class || ''}`;
+                menuItem.textContent = item.text;
+                menuItem.addEventListener('click', () => {
+                    item.action();
+                    this.closeContextMenu();
+                });
+                menu.appendChild(menuItem);
+            }
+        });
+
+        document.body.appendChild(menu);
+
+        // Close menu when clicking outside
+        setTimeout(() => {
+            document.addEventListener('click', this.closeContextMenu.bind(this), { once: true });
+        }, 0);
+    }
+
+    showEmptySpaceContextMenu(event) {
+        this.closeContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.left = event.pageX + 'px';
+        menu.style.top = event.pageY + 'px';
+
+        const menuItems = [
+            { text: 'New File', action: () => this.showCreateDialog('file') },
+            { text: 'New Folder', action: () => this.showCreateDialog('folder') },
+            { separator: true },
+            { text: 'Refresh', action: () => this.loadFileExplorer() }
+        ];
+
+        menuItems.forEach(item => {
+            if (item.separator) {
+                const separator = document.createElement('div');
+                separator.className = 'context-menu-separator';
+                separator.style.cssText = 'height: 1px; background: #3e3e42; margin: 4px 0;';
+                menu.appendChild(separator);
+            } else {
+                const menuItem = document.createElement('div');
+                menuItem.className = 'context-menu-item';
                 menuItem.textContent = item.text;
                 menuItem.addEventListener('click', () => {
                     item.action();

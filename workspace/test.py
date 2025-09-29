@@ -1,4 +1,4 @@
-/# 파이썬 기본 모듈
+# 파이썬 기본 모듈
 import os
 import sys
 import json
