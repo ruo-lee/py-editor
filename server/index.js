@@ -73,6 +73,42 @@ app.get('/api/snippets', async (req, res) => {
   }
 });
 
+// Python standard library file access
+app.get('/api/stdlib/*', async (req, res) => {
+  try {
+    const requestedPath = req.params[0];
+
+    // Security: Only allow access to Python standard library paths
+    const allowedPaths = [
+      '/usr/local/lib/python3.11',
+      '/usr/local/lib/python3.11/site-packages'
+    ];
+
+    let resolvedPath = null;
+    for (const allowedPath of allowedPaths) {
+      const candidatePath = path.join(allowedPath, requestedPath);
+      if (candidatePath.startsWith(allowedPath)) {
+        try {
+          await fs.access(candidatePath);
+          resolvedPath = candidatePath;
+          break;
+        } catch {
+          // File doesn't exist, try next path
+        }
+      }
+    }
+
+    if (!resolvedPath) {
+      return res.status(404).json({ error: 'File not found in Python standard library' });
+    }
+
+    const content = await fs.readFile(resolvedPath, 'utf8');
+    res.json({ content, path: resolvedPath });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Python execution
 app.post('/api/execute', async (req, res) => {
   try {
@@ -167,7 +203,8 @@ wss.on('connection', (ws) => {
           cwd: '/app/workspace',
           env: {
             ...process.env,
-            PYTHONPATH: '/app/workspace'
+            PYTHONPATH: `/app/workspace:/usr/local/lib/python3.11:/usr/local/lib/python3.11/site-packages`,
+            PYTHONHOME: '/usr/local'
           }
         });
 

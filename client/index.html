@@ -42,10 +42,28 @@
 
         .sidebar {
             width: 250px;
+            min-width: 200px;
+            max-width: 600px;
             background: #252526;
             border-right: 1px solid #3e3e42;
             display: flex;
             flex-direction: column;
+            position: relative;
+        }
+
+        .sidebar-resizer {
+            width: 4px;
+            background: transparent;
+            cursor: col-resize;
+            position: absolute;
+            right: -2px;
+            top: 0;
+            bottom: 0;
+            z-index: 10;
+        }
+
+        .sidebar-resizer:hover {
+            background: #0e639c;
         }
 
         .sidebar-header {
@@ -100,6 +118,16 @@
             background: #2a2d2e;
         }
 
+        .tab.stdlib-tab {
+            background: #2d2d2d;
+            color: #cccccc;
+            font-style: italic;
+        }
+
+        .tab.stdlib-tab:hover {
+            background: #3a3a3a;
+        }
+
         .tab-close {
             margin-left: 8px;
             width: 16px;
@@ -119,6 +147,27 @@
 
         .tab-close:hover {
             background: #3e3e42;
+        }
+
+        .file-path-bar {
+            height: 24px;
+            background: #1e1e1e;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 11px;
+            color: #cccccc;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-path-bar.stdlib {
+            background: #2d2d2d;
+            color: #888888;
+            font-style: italic;
         }
 
         .editor-container {
@@ -147,6 +196,28 @@
 
         .file-item.selected {
             background: #37373d;
+        }
+
+        .file-item.active {
+            background: #094771;
+            border-left: 3px solid #0e639c;
+        }
+
+        .file-item.active:hover {
+            background: #0e639c;
+        }
+
+        .file-item.drag-over {
+            background: #2d4a22;
+            border: 1px dashed #6cc04a;
+        }
+
+        .file-item[draggable="true"] {
+            cursor: grab;
+        }
+
+        .file-item[draggable="true"]:active {
+            cursor: grabbing;
         }
 
         .file-icon {
@@ -271,6 +342,20 @@
             background: #3e3e42;
         }
 
+        .context-menu-item.destructive {
+            color: #f14c4c;
+        }
+
+        .context-menu-item.destructive:hover {
+            background: #5a1e1e;
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background: #3e3e42;
+            margin: 4px 0;
+        }
+
         .input-dialog {
             position: fixed;
             top: 0;
@@ -369,7 +454,7 @@
             <span>🐍 Python IDE</span>
         </div>
         <div class="main-content">
-            <div class="sidebar">
+            <div class="sidebar" id="sidebar">
                 <div class="explorer-actions">
                     <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #cccccc;">Explorer</span>
                     <div>
@@ -381,9 +466,11 @@
                 <div class="file-explorer" id="fileExplorer">
                     <div class="loading">Loading files...</div>
                 </div>
+                <div class="sidebar-resizer" id="sidebarResizer"></div>
             </div>
             <div class="editor-area">
                 <div class="tab-bar" id="tabBar"></div>
+                <div class="file-path-bar" id="filePathBar"></div>
                 <div class="editor-container">
                     <div id="editor"></div>
                     <button class="execute-button" id="executeButton" style="display: none;">Run</button>

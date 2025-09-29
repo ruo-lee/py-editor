@@ -3,6 +3,14 @@
 Test file for import suggestions and go-to-definition
 """
 
+# Python standard library imports - test Ctrl+click on these
+import os
+import sys
+import json
+import time
+from pathlib import Path
+
+# Local imports
 from utils import calculate_sum, find_max, MathUtils
 import utils
 
@@ -43,6 +51,36 @@ def test_utils():
         print(number)
 
 
+def test_stdlib_modules():
+    """Test Python standard library go-to-definition"""
+
+    # Test os module - try Ctrl+click on 'getcwd', 'path', 'environ'
+    current_dir = os.getcwd()
+    home_path = os.path.expanduser("~")
+    env_var = os.environ.get("HOME", "/tmp")
+
+    # Test sys module - try Ctrl+click on 'version', 'path', 'exit'
+    python_version = sys.version
+    python_path = sys.path
+
+    # Test json module - try Ctrl+click on 'dumps', 'loads'
+    data = {"test": "value"}
+    json_str = json.dumps(data)
+    parsed_data = json.loads(json_str)
+
+    # Test time module - try Ctrl+click on 'sleep', 'time'
+    current_time = time.time()
+
+    # Test pathlib - try Ctrl+click on 'Path'
+    file_path = Path(__file__)
+    parent_dir = file_path.parent
+
+    print(f"Current directory: {current_dir}")
+    print(f"Python version: {python_version}")
+    print(f"JSON: {json_str}")
+    print(f"File path: {file_path}")
+
+
 def another_function():
     """Another function to test go-to-definition"""
     # Try typing "from utils import " and see autocomplete suggestions
@@ -51,3 +89,4 @@ def another_function():
 
 if __name__ == "__main__":
     test_utils()
+    test_stdlib_modules()

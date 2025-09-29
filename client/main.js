@@ -7,18 +7,22 @@ class PythonIDE {
         this.activeFile = null;
         this.fileExplorer = document.getElementById('fileExplorer');
         this.tabBar = document.getElementById('tabBar');
+        this.filePathBar = document.getElementById('filePathBar');
         this.executeButton = document.getElementById('executeButton');
         this.outputPanel = document.getElementById('outputPanel');
         this.languageClient = null;
         this.snippets = {};
         this.ctrlPressed = false;
         this.currentLinkDecorations = [];
+        this.selectedDirectory = ''; // Currently selected directory for context menu operations
+        this.contextMenuTarget = null; // Target element for context menu
 
         this.initializeEditor();
         this.initializeLanguageServer();
         this.loadSnippets();
         this.loadFileExplorer();
         this.setupEventListeners();
+        this.initializeSidebarResize();
     }
 
     async initializeEditor() {
@@ -466,7 +470,14 @@ class PythonIDE {
         try {
             // Use the active file path for proper LSP resolution
             const filePath = this.activeFile || 'temp.py';
-            const fileUri = `file:///app/workspace/${filePath}`;
+            let fileUri;
+            if (filePath.startsWith('/usr/local/lib/python3.11/')) {
+                // Standard library file - use absolute path
+                fileUri = `file://${filePath}`;
+            } else {
+                // Workspace file - use workspace prefix
+                fileUri = `file:///app/workspace/${filePath}`;
+            }
 
             console.log('Requesting definition at:', {
                 file: filePath,
@@ -517,7 +528,14 @@ class PythonIDE {
     }
 
     async ensureDocumentSynchronized(filePath, content) {
-        const fileUri = `file:///app/workspace/${filePath}`;
+        let fileUri;
+        if (filePath.startsWith('/usr/local/lib/python3.11/')) {
+            // Standard library file - use absolute path
+            fileUri = `file://${filePath}`;
+        } else {
+            // Workspace file - use workspace prefix
+            fileUri = `file:///app/workspace/${filePath}`;
+        }
 
         // Send didChange to ensure document is up to date
         this.sendLSPRequest({
@@ -556,11 +574,23 @@ class PythonIDE {
                     console.log('First location:', location);
 
                     if (location.uri && location.range) {
-                        const uri = location.uri.replace('file:///app/workspace/', '');
-                        console.log('Resolved URI:', uri);
+                        // Handle both workspace and stdlib file URIs
+                        let filePath;
+                        if (location.uri.startsWith('file:///app/workspace/')) {
+                            // Workspace file - remove the workspace prefix
+                            filePath = location.uri.replace('file:///app/workspace/', '');
+                        } else if (location.uri.startsWith('file://')) {
+                            // Other file (like stdlib) - remove file:// protocol
+                            filePath = location.uri.replace('file://', '');
+                        } else {
+                            // Already a relative path
+                            filePath = location.uri;
+                        }
+
+                        console.log('Resolved file path:', filePath);
 
                         resolve({
-                            uri: monaco.Uri.file(uri),
+                            filePath: filePath,
                             range: {
                                 startLineNumber: location.range.start.line + 1,
                                 startColumn: location.range.start.character + 1,
@@ -650,9 +680,9 @@ class PythonIDE {
         if (!position) return;
 
         const definition = await this.getDefinition(this.editor.getModel(), position);
-        if (definition) {
-            const filePath = definition.uri.path;
-            await this.openFile(filePath);
+        if (definition && definition.filePath) {
+            console.log('Opening file:', definition.filePath);
+            await this.openFile(definition.filePath);
 
             // Navigate to the definition position
             this.editor.setPosition({
@@ -762,12 +792,22 @@ class PythonIDE {
 
     notifyDocumentOpened(filepath, content) {
         if (this.languageClient && this.languageClient.readyState === WebSocket.OPEN) {
+            // Determine correct URI based on file path
+            let fileUri;
+            if (filepath.startsWith('/usr/local/lib/python3.11/')) {
+                // Standard library file - use absolute path
+                fileUri = `file://${filepath}`;
+            } else {
+                // Workspace file - use workspace prefix
+                fileUri = `file:///app/workspace/${filepath}`;
+            }
+
             this.sendLSPRequest({
                 jsonrpc: '2.0',
                 method: 'textDocument/didOpen',
                 params: {
                     textDocument: {
-                        uri: `file:///app/workspace/${filepath}`,
+                        uri: fileUri,
                         languageId: 'python',
                         version: 1,
                         text: content
@@ -824,6 +864,8 @@ class PythonIDE {
 
             if (item.type === 'directory') {
                 element.className = 'file-item folder-item';
+                element.setAttribute('data-path', item.path);
+                element.setAttribute('data-type', 'directory');
                 element.innerHTML = `
                     <span class="folder-toggle">▶</span>
                     <span class="file-icon">📁</span>
@@ -834,9 +876,10 @@ class PythonIDE {
                 content.className = 'folder-content';
                 content.style.display = 'none';
 
-                element.addEventListener('click', (e) => {
+                // Directory toggle functionality
+                const toggle = element.querySelector('.folder-toggle');
+                toggle.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const toggle = element.querySelector('.folder-toggle');
                     if (content.style.display === 'none') {
                         content.style.display = 'block';
                         toggle.textContent = '▼';
@@ -849,10 +892,32 @@ class PythonIDE {
                     }
                 });
 
+                // Directory selection for creating files/folders
+                element.addEventListener('click', (e) => {
+                    if (e.target === toggle) return; // Don't select when clicking toggle
+                    e.stopPropagation();
+
+                    // Clear previous selections
+                    document.querySelectorAll('.file-item.selected').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+
+                    element.classList.add('selected');
+                    this.selectedDirectory = item.path;
+                });
+
+                // Right-click context menu
+                element.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.showContextMenu(e, item.path, 'directory');
+                });
+
                 container.appendChild(element);
                 container.appendChild(content);
             } else {
                 element.className = 'file-item';
+                element.setAttribute('data-path', item.path);
+                element.setAttribute('data-type', 'file');
                 element.innerHTML = `
                     <span class="file-icon">${this.getFileIcon(item.name)}</span>
                     <span>${item.name}</span>
@@ -860,6 +925,12 @@ class PythonIDE {
 
                 element.addEventListener('click', () => {
                     this.openFile(item.path);
+                });
+
+                // Right-click context menu
+                element.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.showContextMenu(e, item.path, 'file');
                 });
 
                 container.appendChild(element);
@@ -871,9 +942,34 @@ class PythonIDE {
         const ext = filename.split('.').pop()?.toLowerCase();
         switch (ext) {
             case 'py': return '🐍';
-            case 'json': return '📄';
-            case 'txt': return '📝';
-            case 'md': return '📖';
+            case 'json': return '📋';
+            case 'html': case 'htm': return '🌐';
+            case 'css': case 'scss': case 'sass': return '🎨';
+            case 'js': case 'jsx': case 'ts': case 'tsx': return '📜';
+            case 'md': case 'markdown': return '📝';
+            case 'txt': return '📃';
+            case 'yml': case 'yaml': return '⚙️';
+            case 'xml': return '📰';
+            case 'csv': return '📊';
+            case 'log': return '📜';
+            case 'sql': return '🗃️';
+            case 'sh': case 'bash': return '⚡';
+            case 'php': return '🐘';
+            case 'java': return '☕';
+            case 'c': case 'cpp': case 'h': return '⚙️';
+            case 'go': return '🐹';
+            case 'rs': return '🦀';
+            case 'swift': return '🦉';
+            case 'kt': case 'kts': return '🎯';
+            case 'rb': return '💎';
+            case 'env': return '🔐';
+            case 'config': case 'conf': return '⚙️';
+            case 'dockerfile': return '🐳';
+            case 'gitignore': return '🚫';
+            case 'lock': return '🔒';
+            case 'zip': case 'tar': case 'gz': return '📦';
+            case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg': return '🖼️';
+            case 'pdf': return '📕';
             default: return '📄';
         }
     }
@@ -885,8 +981,29 @@ class PythonIDE {
                 return;
             }
 
-            const response = await fetch(`/api/files/${filepath}`);
-            const data = await response.json();
+            let response, data;
+
+            // Check if this is a Python standard library file
+            if (filepath.startsWith('/usr/local/lib/python3.11/')) {
+                // Extract the relative path from the stdlib base path
+                const stdlibPath = filepath.replace('/usr/local/lib/python3.11/', '');
+                response = await fetch(`/api/stdlib/${stdlibPath}`);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load stdlib file: ${filepath}`);
+                }
+
+                data = await response.json();
+            } else {
+                // Regular workspace file
+                response = await fetch(`/api/files/${filepath}`);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load file: ${filepath}`);
+                }
+
+                data = await response.json();
+            }
 
             const model = monaco.editor.createModel(
                 data.content,
@@ -896,10 +1013,11 @@ class PythonIDE {
 
             this.openTabs.set(filepath, {
                 model,
-                saved: true
+                saved: true,
+                isStdlib: filepath.startsWith('/usr/local/lib/python3.11/')
             });
 
-            // Notify language server of opened document
+            // Notify language server for all Python files
             this.notifyDocumentOpened(filepath, data.content);
 
             this.createTab(filepath);
@@ -907,6 +1025,8 @@ class PythonIDE {
 
         } catch (error) {
             console.error('Failed to open file:', error);
+            // Show user-friendly error message
+            alert(`Could not open file: ${filepath.split('/').pop()}\nError: ${error.message}`);
         }
     }
 
@@ -924,13 +1044,18 @@ class PythonIDE {
 
     createTab(filepath) {
         const filename = filepath.split('/').pop();
+        const isStdlib = filepath.startsWith('/usr/local/lib/python3.11/');
         const tab = document.createElement('div');
         tab.className = 'tab';
         tab.dataset.filepath = filepath;
         tab.innerHTML = `
-            <span>${filename}</span>
+            <span>${filename}${isStdlib ? ' (read-only)' : ''}</span>
             <span class="tab-close">×</span>
         `;
+
+        if (isStdlib) {
+            tab.classList.add('stdlib-tab');
+        }
 
         tab.addEventListener('click', (e) => {
             if (e.target.classList.contains('tab-close')) {
@@ -960,9 +1085,15 @@ class PythonIDE {
             this.editor.setModel(tabData.model);
             this.activeFile = filepath;
 
-            // Show execute button for Python files
+            // Update file path display
+            this.updateFilePathDisplay(filepath, tabData.isStdlib);
+
+            // Update active file highlighting in explorer
+            this.updateActiveFileHighlight();
+
+            // Show execute button for Python files (not for stdlib files)
             const isPython = filepath.endsWith('.py');
-            this.executeButton.style.display = isPython ? 'block' : 'none';
+            this.executeButton.style.display = (isPython && !tabData.isStdlib) ? 'block' : 'none';
         }
     }
 
@@ -1120,11 +1251,14 @@ class PythonIDE {
     showCreateDialog(type) {
         this.closeDialog();
 
+        const currentDir = this.selectedDirectory || '';
+        const dirDisplay = currentDir ? ` in ${currentDir}` : ' in root';
+
         const dialog = document.createElement('div');
         dialog.className = 'input-dialog';
         dialog.innerHTML = `
             <div class="input-dialog-content">
-                <h3>Create New ${type === 'file' ? 'File' : 'Folder'}</h3>
+                <h3>Create New ${type === 'file' ? 'File' : 'Folder'}${dirDisplay}</h3>
                 <input type="text" id="nameInput" placeholder="Enter ${type} name..." />
                 <div class="input-dialog-buttons">
                     <button class="dialog-button secondary" onclick="this.closest('.input-dialog').remove()">Cancel</button>
@@ -1145,10 +1279,18 @@ class PythonIDE {
             if (!name) return;
 
             try {
+                const fullPath = this.selectedDirectory ? `${this.selectedDirectory}/${name}` : name;
+
+                // Check if file/folder already exists
+                if (await this.checkIfFileExists(fullPath)) {
+                    alert(`A ${type} named "${name}" already exists in this directory.`);
+                    return;
+                }
+
                 if (type === 'file') {
-                    await this.createFile(name);
+                    await this.createFile(fullPath);
                 } else {
-                    await this.createFolder(name);
+                    await this.createFolder(fullPath);
                 }
                 dialog.remove();
                 this.loadFileExplorer();
@@ -1198,6 +1340,15 @@ class PythonIDE {
         }
     }
 
+    async checkIfFileExists(filepath) {
+        try {
+            const response = await fetch(`/api/files/${filepath}`);
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
+    }
+
     closeDialog() {
         const dialogs = document.querySelectorAll('.input-dialog');
         dialogs.forEach(dialog => dialog.remove());
@@ -1206,6 +1357,324 @@ class PythonIDE {
     closeContextMenu() {
         const menus = document.querySelectorAll('.context-menu');
         menus.forEach(menu => menu.remove());
+    }
+
+    updateFilePathDisplay(filepath, isStdlib = false) {
+        if (!this.filePathBar) return;
+
+        if (filepath) {
+            // Format the file path for display
+            let displayPath = filepath;
+            if (isStdlib) {
+                displayPath = `Python Standard Library: ${filepath}`;
+                this.filePathBar.className = 'file-path-bar stdlib';
+            } else {
+                displayPath = `Workspace: ${filepath}`;
+                this.filePathBar.className = 'file-path-bar';
+            }
+            this.filePathBar.textContent = displayPath;
+            this.filePathBar.title = filepath; // Show full path on hover
+        } else {
+            this.filePathBar.textContent = '';
+            this.filePathBar.className = 'file-path-bar';
+        }
+    }
+
+    updateActiveFileHighlight() {
+        // Clear all active highlights
+        document.querySelectorAll('.file-item.active').forEach(el => {
+            el.classList.remove('active');
+        });
+
+        // Highlight current active file
+        if (this.activeFile) {
+            const activeElement = document.querySelector(`[data-path="${this.activeFile}"][data-type="file"]`);
+            if (activeElement) {
+                activeElement.classList.add('active');
+            }
+        }
+    }
+
+    initializeSidebarResize() {
+        const sidebar = document.getElementById('sidebar');
+        const resizer = document.getElementById('sidebarResizer');
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            e.preventDefault();
+        });
+
+        const handleMouseMove = (e) => {
+            if (!isResizing) return;
+            const newWidth = e.clientX;
+            const minWidth = 200;
+            const maxWidth = 600;
+
+            if (newWidth >= minWidth && newWidth <= maxWidth) {
+                sidebar.style.width = newWidth + 'px';
+            }
+        };
+
+        const handleMouseUp = () => {
+            isResizing = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }
+
+    showContextMenu(event, filePath, type) {
+        this.closeContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.left = event.pageX + 'px';
+        menu.style.top = event.pageY + 'px';
+
+        const fileName = filePath.split('/').pop();
+        const isDirectory = type === 'directory';
+
+        let menuItems = [];
+
+        if (isDirectory) {
+            menuItems = [
+                { text: 'New File', action: () => this.createFileInDirectory(filePath) },
+                { text: 'New Folder', action: () => this.createFolderInDirectory(filePath) },
+                { separator: true },
+                { text: 'Rename', action: () => this.renameItem(filePath, type) },
+                { text: 'Duplicate', action: () => this.duplicateItem(filePath, type) },
+                { separator: true },
+                { text: 'Copy Path', action: () => this.copyToClipboard(filePath) },
+                { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filePath}`) },
+                { separator: true },
+                { text: 'Delete', action: () => this.deleteItem(filePath, type), class: 'destructive' }
+            ];
+        } else {
+            menuItems = [
+                { text: 'Open', action: () => this.openFile(filePath) },
+                { separator: true },
+                { text: 'Rename', action: () => this.renameItem(filePath, type) },
+                { text: 'Duplicate', action: () => this.duplicateItem(filePath, type) },
+                { separator: true },
+                { text: 'Copy Path', action: () => this.copyToClipboard(filePath) },
+                { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filePath}`) },
+                { separator: true },
+                { text: 'Delete', action: () => this.deleteItem(filePath, type), class: 'destructive' }
+            ];
+        }
+
+        menuItems.forEach(item => {
+            if (item.separator) {
+                const separator = document.createElement('div');
+                separator.className = 'context-menu-separator';
+                menu.appendChild(separator);
+            } else {
+                const menuItem = document.createElement('div');
+                menuItem.className = `context-menu-item ${item.class || ''}`;
+                menuItem.textContent = item.text;
+                menuItem.addEventListener('click', () => {
+                    item.action();
+                    this.closeContextMenu();
+                });
+                menu.appendChild(menuItem);
+            }
+        });
+
+        document.body.appendChild(menu);
+
+        // Close menu when clicking outside
+        setTimeout(() => {
+            document.addEventListener('click', this.closeContextMenu.bind(this), { once: true });
+        }, 0);
+    }
+
+    async createFileInDirectory(dirPath) {
+        this.selectedDirectory = dirPath;
+        this.showCreateDialog('file');
+    }
+
+    async createFolderInDirectory(dirPath) {
+        this.selectedDirectory = dirPath;
+        this.showCreateDialog('folder');
+    }
+
+    async renameItem(filePath, type) {
+        const currentName = filePath.split('/').pop();
+        const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+
+        const dialog = document.createElement('div');
+        dialog.className = 'input-dialog';
+        dialog.innerHTML = `
+            <div class="input-dialog-content">
+                <h3>Rename ${type === 'file' ? 'File' : 'Folder'}</h3>
+                <input type="text" id="renameInput" value="${currentName}" />
+                <div class="input-dialog-buttons">
+                    <button class="dialog-button secondary" onclick="this.closest('.input-dialog').remove()">Cancel</button>
+                    <button class="dialog-button primary" id="renameBtn">Rename</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        const input = dialog.querySelector('#renameInput');
+        const renameBtn = dialog.querySelector('#renameBtn');
+
+        input.focus();
+        input.select();
+
+        const rename = async () => {
+            const newName = input.value.trim();
+            if (!newName || newName === currentName) {
+                dialog.remove();
+                return;
+            }
+
+            try {
+                const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+                await this.moveItem(filePath, newPath);
+                dialog.remove();
+                this.loadFileExplorer();
+            } catch (error) {
+                alert('Failed to rename: ' + error.message);
+            }
+        };
+
+        renameBtn.addEventListener('click', rename);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') rename();
+            if (e.key === 'Escape') dialog.remove();
+        });
+    }
+
+    async duplicateItem(filePath, type) {
+        const fileName = filePath.split('/').pop();
+        const extension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
+        const baseName = fileName.replace(extension, '');
+        const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+
+        let copyName = `${baseName}_copy${extension}`;
+        let counter = 1;
+
+        // Check if copy already exists and increment counter
+        while (await this.fileExists(parentPath ? `${parentPath}/${copyName}` : copyName)) {
+            copyName = `${baseName}_copy${counter}${extension}`;
+            counter++;
+        }
+
+        try {
+            const newPath = parentPath ? `${parentPath}/${copyName}` : copyName;
+            await this.copyItem(filePath, newPath, type);
+            this.loadFileExplorer();
+        } catch (error) {
+            alert('Failed to duplicate: ' + error.message);
+        }
+    }
+
+    async deleteItem(filePath, type) {
+        const fileName = filePath.split('/').pop();
+        const confirmMsg = `Are you sure you want to delete "${fileName}"?`;
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const response = await fetch(`/api/files/${filePath}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete item');
+            }
+
+            // Close tab if file is open
+            if (type === 'file' && this.openTabs.has(filePath)) {
+                this.closeTab(filePath);
+            }
+
+            this.loadFileExplorer();
+        } catch (error) {
+            alert('Failed to delete: ' + error.message);
+        }
+    }
+
+    async moveItem(oldPath, newPath) {
+        // For now, we'll simulate move by copy + delete
+        const response = await fetch(`/api/files/${oldPath}`);
+        if (!response.ok) throw new Error('File not found');
+
+        const data = await response.json();
+
+        // Create new file
+        await fetch(`/api/files/${newPath}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: data.content })
+        });
+
+        // Delete old file
+        await fetch(`/api/files/${oldPath}`, { method: 'DELETE' });
+
+        // Update open tabs
+        if (this.openTabs.has(oldPath)) {
+            const tabData = this.openTabs.get(oldPath);
+            this.openTabs.delete(oldPath);
+            this.openTabs.set(newPath, tabData);
+            this.activeFile = newPath;
+
+            // Update tab display
+            const tab = document.querySelector(`[data-filepath="${oldPath}"]`);
+            if (tab) {
+                tab.setAttribute('data-filepath', newPath);
+                tab.querySelector('span').textContent = newPath.split('/').pop();
+            }
+        }
+    }
+
+    async copyItem(sourcePath, targetPath, type) {
+        if (type === 'file') {
+            const response = await fetch(`/api/files/${sourcePath}`);
+            if (!response.ok) throw new Error('File not found');
+
+            const data = await response.json();
+
+            await fetch(`/api/files/${targetPath}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: data.content })
+            });
+        } else {
+            // For directories, we'd need server-side support
+            throw new Error('Directory duplication not yet implemented');
+        }
+    }
+
+    async fileExists(filePath) {
+        try {
+            const response = await fetch(`/api/files/${filePath}`);
+            return response.ok;
+        } catch {
+            return false;
+        }
+    }
+
+    copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            // Show brief success message
+            const msg = document.createElement('div');
+            msg.style.cssText = `
+                position: fixed; top: 20px; right: 20px; background: #4CAF50;
+                color: white; padding: 8px 16px; border-radius: 4px; z-index: 9999;
+                font-size: 14px; pointer-events: none;
+            `;
+            msg.textContent = 'Path copied to clipboard';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 2000);
+        }).catch(() => {
+            alert('Failed to copy to clipboard');
+        });
     }
 }
 
