@@ -77,20 +77,16 @@ class PythonIDE {
 
         // Monaco Editor keyboard events (support Mac Cmd key)
         this.editor.onKeyDown((e) => {
-            console.log('Monaco keydown:', e.keyCode, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
             const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
             if (isModifierPressed || e.ctrlKey || e.metaKey) {
-                console.log('Monaco detected modifier key, setting ctrlPressed to true');
                 this.ctrlPressed = true;
                 this.updateCursorStyle();
             }
         });
 
         this.editor.onKeyUp((e) => {
-            console.log('Monaco keyup:', e.keyCode, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
             const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
             if (!isModifierPressed && !e.ctrlKey && !e.metaKey) {
-                console.log('Monaco detected modifier release, setting ctrlPressed to false');
                 this.ctrlPressed = false;
                 this.updateCursorStyle();
                 this.clearLinkDecorations();
@@ -102,20 +98,16 @@ class PythonIDE {
         this.isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
         document.addEventListener('keydown', (e) => {
-            console.log('keydown event:', e.key, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey, 'platform:', navigator.platform);
             const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
             if (isModifierPressed || e.ctrlKey || e.metaKey) {
-                console.log('Setting ctrlPressed to true');
                 this.ctrlPressed = true;
                 this.updateCursorStyle();
             }
         });
 
         document.addEventListener('keyup', (e) => {
-            console.log('keyup event:', e.key, 'ctrlKey:', e.ctrlKey, 'metaKey:', e.metaKey);
             const isModifierPressed = this.isMac ? e.metaKey : e.ctrlKey;
             if (!isModifierPressed && !e.ctrlKey && !e.metaKey) {
-                console.log('Setting ctrlPressed to false');
                 this.ctrlPressed = false;
                 this.updateCursorStyle();
                 this.clearLinkDecorations();
@@ -741,15 +733,13 @@ class PythonIDE {
     }
 
     handleMouseMove(e) {
-        console.log('handleMouseMove - ctrlPressed:', this.ctrlPressed, 'event:', e);
-        if (this.ctrlPressed) {
-            // Get the position from Monaco's mouse event
-            const position = e.target ? e.target.position : null;
-            console.log('Position from event:', position);
+        if (this.ctrlPressed && e.target) {
+            // Monaco 에디터의 마우스 이벤트에서 position 추출
+            const position = e.target.position;
+
             if (position) {
                 this.showLinkAtPosition(position);
             } else {
-                console.log('No position found, clearing decorations');
                 this.clearLinkDecorations();
             }
         } else {
@@ -769,15 +759,12 @@ class PythonIDE {
     }
 
     showLinkAtPosition(position) {
-        console.log('showLinkAtPosition called:', position);
         const model = this.editor.getModel();
         if (!model) {
-            console.log('No model found');
             return;
         }
 
         const word = model.getWordAtPosition(position);
-        console.log('Word at position:', word);
         if (!word) {
             this.clearLinkDecorations();
             return;
@@ -785,9 +772,7 @@ class PythonIDE {
 
         // Check if this is a linkable element (variable, function, import)
         const line = model.getLineContent(position.lineNumber);
-        console.log('Line content:', line);
         const isLinkable = this.isLinkableElement(line, word.word, position);
-        console.log('Is linkable:', isLinkable);
 
         if (isLinkable) {
             const range = {
@@ -797,18 +782,16 @@ class PythonIDE {
                 endColumn: word.endColumn
             };
 
-            console.log('Applying decoration to range:', range);
             this.currentLinkDecorations = this.editor.deltaDecorations(
                 this.currentLinkDecorations || [],
                 [{
                     range: range,
                     options: {
-                        className: 'ctrl-hover-link',
+                        inlineClassName: 'ctrl-hover-link',
                         stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
                     }
                 }]
             );
-            console.log('Applied decorations:', this.currentLinkDecorations);
         } else {
             this.clearLinkDecorations();
         }
@@ -912,6 +895,7 @@ class PythonIDE {
     renderFileExplorer(files, container = this.fileExplorer, level = 0) {
         if (level === 0) {
             container.innerHTML = '';
+            this.setupExplorerDropZone(container);
         }
 
         files.forEach(item => {
@@ -921,6 +905,7 @@ class PythonIDE {
                 element.className = 'file-item folder-item';
                 element.setAttribute('data-path', item.path);
                 element.setAttribute('data-type', 'directory');
+                element.setAttribute('draggable', 'true');
                 element.innerHTML = `
                     <span class="folder-toggle">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -972,12 +957,17 @@ class PythonIDE {
                     this.showContextMenu(e, item.path, 'directory');
                 });
 
+                // 드래그 앤 드롭 이벤트
+                this.setupDragEvents(element, item);
+                this.setupDropZone(element, item);
+
                 container.appendChild(element);
                 container.appendChild(content);
             } else {
                 element.className = 'file-item';
                 element.setAttribute('data-path', item.path);
                 element.setAttribute('data-type', 'file');
+                element.setAttribute('draggable', 'true');
                 element.innerHTML = `
                     <span class="file-icon">${this.getFileIcon(item.name)}</span>
                     <span>${item.name}</span>
@@ -993,9 +983,197 @@ class PythonIDE {
                     this.showContextMenu(e, item.path, 'file');
                 });
 
+                // 드래그 앤 드롭 이벤트
+                this.setupDragEvents(element, item);
+
                 container.appendChild(element);
             }
         });
+    }
+
+    setupExplorerDropZone(container) {
+        // 파일 탐색기 전체 영역을 드롭 존으로 설정 (루트에 파일 업로드)
+        container.addEventListener('dragover', (e) => {
+            // 외부 파일만 허용
+            if (e.dataTransfer.types.includes('Files')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                container.classList.add('drag-over');
+            }
+        });
+
+        container.addEventListener('dragleave', (e) => {
+            if (e.target === container) {
+                container.classList.remove('drag-over');
+            }
+        });
+
+        container.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            container.classList.remove('drag-over');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                await this.handleFileUpload(files, '');
+            }
+        });
+    }
+
+    setupDragEvents(element, item) {
+        element.addEventListener('dragstart', (e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                path: item.path,
+                name: item.name,
+                type: item.type
+            }));
+            element.classList.add('dragging');
+        });
+
+        element.addEventListener('dragend', (e) => {
+            element.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+        });
+    }
+
+    setupDropZone(element, item) {
+        if (item.type !== 'directory') return;
+
+        element.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const jsonData = e.dataTransfer.types.includes('application/json');
+            const filesData = e.dataTransfer.types.includes('Files');
+
+            if (jsonData || filesData) {
+                e.dataTransfer.dropEffect = jsonData ? 'move' : 'copy';
+                element.classList.add('drag-over');
+            }
+        });
+
+        element.addEventListener('dragleave', (e) => {
+            if (e.target === element) {
+                element.classList.remove('drag-over');
+            }
+        });
+
+        element.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            element.classList.remove('drag-over');
+
+            // 내부 파일/폴더 이동
+            const jsonData = e.dataTransfer.getData('application/json');
+            if (jsonData) {
+                const data = JSON.parse(jsonData);
+                await this.handleItemMove(data, item.path);
+                return;
+            }
+
+            // 외부 파일 업로드
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                await this.handleFileUpload(files, item.path);
+            }
+        });
+    }
+
+    async handleItemMove(draggedItem, targetPath) {
+        try {
+            // 자기 자신에게 드롭하는 경우 무시
+            if (draggedItem.path === targetPath) {
+                return;
+            }
+
+            // 하위 폴더로 이동하는 경우 방지
+            if (targetPath.startsWith(draggedItem.path + '/')) {
+                alert('Cannot move a folder into itself');
+                return;
+            }
+
+            const newPath = `${targetPath}/${draggedItem.name}`;
+
+            // 이미 같은 이름의 파일이 있는지 확인
+            if (await this.fileExists(newPath)) {
+                if (!confirm(`"${draggedItem.name}" already exists. Do you want to replace it?`)) {
+                    return;
+                }
+            }
+
+            const response = await fetch('/api/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    source: draggedItem.path,
+                    destination: newPath
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to move item');
+            }
+
+            // 열린 탭 업데이트
+            if (this.openTabs.has(draggedItem.path)) {
+                const tabData = this.openTabs.get(draggedItem.path);
+                this.openTabs.delete(draggedItem.path);
+                this.openTabs.set(newPath, tabData);
+
+                if (this.activeFile === draggedItem.path) {
+                    this.activeFile = newPath;
+                }
+
+                const tab = document.querySelector(`[data-filepath="${draggedItem.path}"]`);
+                if (tab) {
+                    tab.setAttribute('data-filepath', newPath);
+                    tab.querySelector('span').textContent = draggedItem.name;
+                }
+            }
+
+            this.loadFileExplorer();
+        } catch (error) {
+            alert('Failed to move item: ' + error.message);
+        }
+    }
+
+    async handleFileUpload(files, targetPath) {
+        try {
+            const formData = new FormData();
+
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            formData.append('targetPath', targetPath);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to upload files');
+            }
+
+            const result = await response.json();
+
+            // 성공 메시지 표시
+            const msg = document.createElement('div');
+            msg.style.cssText = `
+                position: fixed; top: 20px; right: 20px; background: #4CAF50;
+                color: white; padding: 8px 16px; border-radius: 4px; z-index: 9999;
+                font-size: 14px; pointer-events: none;
+            `;
+            msg.textContent = `Uploaded ${result.files.length} file(s)`;
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 2000);
+
+            this.loadFileExplorer();
+        } catch (error) {
+            alert('Failed to upload files: ' + error.message);
+        }
     }
 
     getFileIcon(filename) {
@@ -1518,6 +1696,8 @@ class PythonIDE {
                 { text: 'Rename', action: () => this.renameItem(filePath, type) },
                 { text: 'Duplicate', action: () => this.duplicateItem(filePath, type) },
                 { separator: true },
+                { text: 'Download as ZIP', action: () => this.downloadItem(filePath) },
+                { separator: true },
                 { text: 'Copy Path', action: () => this.copyToClipboard(filePath) },
                 { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filePath}`) },
                 { separator: true },
@@ -1529,6 +1709,8 @@ class PythonIDE {
                 { separator: true },
                 { text: 'Rename', action: () => this.renameItem(filePath, type) },
                 { text: 'Duplicate', action: () => this.duplicateItem(filePath, type) },
+                { separator: true },
+                { text: 'Download', action: () => this.downloadItem(filePath) },
                 { separator: true },
                 { text: 'Copy Path', action: () => this.copyToClipboard(filePath) },
                 { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filePath}`) },
@@ -1787,6 +1969,28 @@ class PythonIDE {
         }).catch(() => {
             alert('Failed to copy to clipboard');
         });
+    }
+
+    downloadItem(filePath) {
+        // 다운로드 링크 생성
+        const downloadUrl = `/api/download/${filePath}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = ''; // 서버에서 파일명 결정
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // 성공 메시지 표시
+        const msg = document.createElement('div');
+        msg.style.cssText = `
+            position: fixed; top: 20px; right: 20px; background: #4CAF50;
+            color: white; padding: 8px 16px; border-radius: 4px; z-index: 9999;
+            font-size: 14px; pointer-events: none;
+        `;
+        msg.textContent = 'Download started';
+        document.body.appendChild(msg);
+        setTimeout(() => msg.remove(), 2000);
     }
 }
 

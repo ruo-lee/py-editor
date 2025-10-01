@@ -2,12 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
 const chokidar = require('chokidar');
+const multer = require('multer');
+const archiver = require('archiver');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// Multer 설정 (파일 업로드)
+const upload = multer({ dest: '/tmp/uploads/' });
 
 app.use(cors());
 app.use(express.json());
@@ -55,8 +61,95 @@ app.post('/api/files/*', async (req, res) => {
 app.delete('/api/files/*', async (req, res) => {
   try {
     const filePath = path.join('/app/workspace', req.params[0]);
-    await fs.unlink(filePath);
+    const stat = await fs.stat(filePath);
+
+    if (stat.isDirectory()) {
+      await fs.rm(filePath, { recursive: true });
+    } else {
+      await fs.unlink(filePath);
+    }
+
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 파일/폴더 이동
+app.post('/api/move', async (req, res) => {
+  try {
+    const { source, destination } = req.body;
+    const sourcePath = path.join('/app/workspace', source);
+    const destPath = path.join('/app/workspace', destination);
+
+    // 대상 디렉토리가 존재하는지 확인
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+
+    // 파일/폴더 이동
+    await fs.rename(sourcePath, destPath);
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 외부 파일 업로드
+app.post('/api/upload', upload.array('files'), async (req, res) => {
+  try {
+    const { targetPath } = req.body;
+    const uploadedFiles = [];
+
+    for (const file of req.files) {
+      const destPath = path.join('/app/workspace', targetPath, file.originalname);
+
+      // 대상 디렉토리가 존재하는지 확인
+      await fs.mkdir(path.dirname(destPath), { recursive: true });
+
+      // 파일 이동
+      await fs.rename(file.path, destPath);
+
+      uploadedFiles.push({
+        name: file.originalname,
+        path: path.join(targetPath, file.originalname)
+      });
+    }
+
+    res.json({ success: true, files: uploadedFiles });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 파일/폴더 다운로드
+app.get('/api/download/*', async (req, res) => {
+  try {
+    const filePath = path.join('/app/workspace', req.params[0]);
+    const stat = await fs.stat(filePath);
+
+    if (stat.isDirectory()) {
+      // 폴더를 ZIP으로 압축해서 다운로드
+      const folderName = path.basename(filePath);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${folderName}.zip"`);
+
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      archive.on('error', (err) => {
+        throw err;
+      });
+
+      archive.pipe(res);
+      archive.directory(filePath, false);
+      archive.finalize();
+    } else {
+      // 단일 파일 다운로드
+      const fileName = path.basename(filePath);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      const fileStream = fsSync.createReadStream(filePath);
+      fileStream.pipe(res);
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

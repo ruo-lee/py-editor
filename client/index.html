@@ -236,12 +236,22 @@
             border: 1px dashed #6cc04a;
         }
 
+        .file-item.dragging {
+            opacity: 0.5;
+            background: rgba(14, 99, 156, 0.2);
+        }
+
         .file-item[draggable="true"] {
             cursor: grab;
         }
 
         .file-item[draggable="true"]:active {
             cursor: grabbing;
+        }
+
+        .file-explorer.drag-over {
+            background: rgba(108, 192, 74, 0.1);
+            border: 2px dashed #6cc04a;
         }
 
         .file-icon {
@@ -499,13 +509,21 @@
         }
 
         /* Ctrl+hover link styling */
-        .monaco-editor .ctrl-hover-link {
+        .ctrl-hover-link {
             color: #4FC3F7 !important;
             text-decoration: underline !important;
             cursor: pointer !important;
-            background: rgba(79, 195, 247, 0.1) !important;
-            border-radius: 2px !important;
-            font-weight: 500 !important;
+        }
+
+        /* Additional styling for Monaco inline decorations */
+        .monaco-editor .view-line .ctrl-hover-link {
+            color: #4FC3F7 !important;
+            text-decoration: underline !important;
+        }
+
+        /* Cursor pointer when Ctrl is pressed */
+        .monaco-editor.ctrl-key-pressed {
+            cursor: pointer !important;
         }
 
         .monaco-editor .view-line span:hover {
