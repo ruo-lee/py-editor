@@ -11,11 +11,11 @@ import time
 from pathlib import Path
 
 # Local imports
-from utils import calculate_sum, find_max, MathUtils
+from utils import calculate_sum, find_max, MathUtilstest_imports.py
 import utils
 
 
-def test_local_definition():
+def test_local_definition():test_imports.py
     """Test local variable and function definition"""
     my_variable = 42
     return my_variable

@@ -43,6 +43,38 @@ const logger = {
 // Multer 설정 (파일 업로드)
 const upload = multer({ dest: '/tmp/uploads/' });
 
+// Path validation and base path utilities
+const WORKSPACE_ROOT = '/app/workspace';
+
+function validateAndResolvePath(requestedPath) {
+  // Normalize the path and resolve it
+  const normalizedPath = path.normalize(requestedPath).replace(/^(\.\.[\/\\])+/, '');
+  const fullPath = path.join(WORKSPACE_ROOT, normalizedPath);
+
+  // Security: Ensure the path is within workspace
+  if (!fullPath.startsWith(WORKSPACE_ROOT)) {
+    throw new Error('Access denied: Path outside workspace');
+  }
+
+  return fullPath;
+}
+
+function getBasePath(req) {
+  const folderParam = req.query.folder || req.headers['x-workspace-folder'];
+
+  // Empty or root folder should use WORKSPACE_ROOT
+  if (!folderParam || folderParam.trim() === '' || folderParam === '/') {
+    return WORKSPACE_ROOT;
+  }
+
+  try {
+    return validateAndResolvePath(folderParam);
+  } catch (error) {
+    logger.warn('Invalid folder parameter', { folder: folderParam, error: error.message });
+    return WORKSPACE_ROOT;
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -53,9 +85,14 @@ app.use('/workspace', express.static('/app/workspace'));
 // File system operations
 app.get('/api/files', async (req, res) => {
   try {
-    const workspacePath = '/app/workspace';
-    const files = await getDirectoryStructure(workspacePath);
-    res.json(files);
+    const basePath = getBasePath(req);
+    const files = await getDirectoryStructure(basePath, basePath);
+
+    // Return base path info for client
+    res.json({
+      basePath: basePath.replace(WORKSPACE_ROOT, ''),
+      files: files
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -63,7 +100,8 @@ app.get('/api/files', async (req, res) => {
 
 app.get('/api/files/*', async (req, res) => {
   try {
-    const filePath = path.join('/app/workspace', req.params[0]);
+    const basePath = getBasePath(req);
+    const filePath = path.join(basePath, req.params[0]);
     const content = await fs.readFile(filePath, 'utf8');
     res.json({ content });
   } catch (error) {
@@ -73,7 +111,8 @@ app.get('/api/files/*', async (req, res) => {
 
 app.post('/api/files/*', async (req, res) => {
   try {
-    const filePath = path.join('/app/workspace', req.params[0]);
+    const basePath = getBasePath(req);
+    const filePath = path.join(basePath, req.params[0]);
     const { content } = req.body;
 
     // Ensure directory exists
@@ -88,7 +127,8 @@ app.post('/api/files/*', async (req, res) => {
 
 app.delete('/api/files/*', async (req, res) => {
   try {
-    const filePath = path.join('/app/workspace', req.params[0]);
+    const basePath = getBasePath(req);
+    const filePath = path.join(basePath, req.params[0]);
     const stat = await fs.stat(filePath);
 
     if (stat.isDirectory()) {
@@ -106,8 +146,9 @@ app.delete('/api/files/*', async (req, res) => {
 // 디렉토리 생성
 app.post('/api/mkdir', async (req, res) => {
   try {
+    const basePath = getBasePath(req);
     const { path: dirPath } = req.body;
-    const fullPath = path.join('/app/workspace', dirPath);
+    const fullPath = path.join(basePath, dirPath);
 
     await fs.mkdir(fullPath, { recursive: true });
 
@@ -120,9 +161,10 @@ app.post('/api/mkdir', async (req, res) => {
 // 파일/폴더 이동
 app.post('/api/move', async (req, res) => {
   try {
+    const basePath = getBasePath(req);
     const { source, destination } = req.body;
-    const sourcePath = path.join('/app/workspace', source);
-    const destPath = path.join('/app/workspace', destination);
+    const sourcePath = path.join(basePath, source);
+    const destPath = path.join(basePath, destination);
 
     // 대상 디렉토리가 존재하는지 확인
     await fs.mkdir(path.dirname(destPath), { recursive: true });
@@ -139,26 +181,56 @@ app.post('/api/move', async (req, res) => {
 // 외부 파일 업로드
 app.post('/api/upload', upload.array('files'), async (req, res) => {
   try {
+    const basePath = getBasePath(req);
     const { targetPath } = req.body;
+    const relativePaths = req.body.relativePaths;
+
+    logger.info('File upload request', {
+      basePath,
+      targetPath,
+      fileCount: req.files?.length || 0,
+      hasRelativePaths: !!relativePaths
+    });
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files provided' });
+    }
+
     const uploadedFiles = [];
 
-    for (const file of req.files) {
-      const destPath = path.join('/app/workspace', targetPath, file.originalname);
+    // Convert relativePaths to array if it's a single string
+    const relativePathsArray = Array.isArray(relativePaths) ? relativePaths : (relativePaths ? [relativePaths] : []);
+
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+
+      // Use relative path if provided (directory upload), otherwise use original filename
+      const relativePath = relativePathsArray[i] || file.originalname;
+      const destPath = path.join(basePath, targetPath || '', relativePath);
 
       // 대상 디렉토리가 존재하는지 확인
       await fs.mkdir(path.dirname(destPath), { recursive: true });
 
-      // 파일 이동
-      await fs.rename(file.path, destPath);
+      // 파일 복사 후 삭제 (cross-device 지원)
+      await fs.copyFile(file.path, destPath);
+      await fs.unlink(file.path);
 
       uploadedFiles.push({
         name: file.originalname,
-        path: path.join(targetPath, file.originalname)
+        path: path.join(targetPath || '', relativePath)
+      });
+
+      logger.debug('File uploaded', {
+        originalName: file.originalname,
+        relativePath,
+        destPath
       });
     }
 
+    logger.info('Upload completed', { fileCount: uploadedFiles.length });
     res.json({ success: true, files: uploadedFiles });
   } catch (error) {
+    logger.error('Upload failed', { error: error.message, stack: error.stack });
     res.status(500).json({ error: error.message });
   }
 });
@@ -166,7 +238,8 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 // 파일/폴더 다운로드
 app.get('/api/download/*', async (req, res) => {
   try {
-    const filePath = path.join('/app/workspace', req.params[0]);
+    const basePath = getBasePath(req);
+    const filePath = path.join(basePath, req.params[0]);
     const stat = await fs.stat(filePath);
 
     if (stat.isDirectory()) {
@@ -446,9 +519,16 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Serve React app for all other routes
+// Serve SPA for HTML routes only (not static assets)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  // Only serve index.html for non-file requests
+  if (req.path.includes('.')) {
+    // If file extension exists and wasn't found by static middleware, return 404
+    res.status(404).send('Not found');
+  } else {
+    // Serve index.html for SPA routes
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  }
 });
 
 server.listen(PORT, '0.0.0.0', () => {

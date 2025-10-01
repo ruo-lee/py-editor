@@ -104,8 +104,31 @@
         .editor-area {
             flex: 1;
             display: flex;
+            flex-direction: row;
+            min-width: 0;
+        }
+
+        .editor-group {
+            flex: 1;
+            display: flex;
             flex-direction: column;
             min-width: 0;
+            position: relative;
+        }
+
+        .editor-group.split {
+            border-right: 1px solid #3e3e42;
+        }
+
+        .split-divider {
+            width: 4px;
+            background: #2d2d30;
+            cursor: col-resize;
+            position: relative;
+        }
+
+        .split-divider:hover {
+            background: #007acc;
         }
 
         .tab-bar {
@@ -114,26 +137,60 @@
             border-bottom: 1px solid #3e3e42;
             display: flex;
             align-items: center;
+            position: relative;
+        }
+
+        .split-toggle-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #cccccc;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
+            z-index: 10;
+        }
+
+        .split-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
         }
 
         .tab {
             height: 35px;
-            padding: 0 15px;
+            padding: 0 12px;
             display: flex;
             align-items: center;
-            background: #1e1e1e;
-            border-right: 1px solid #3e3e42;
+            gap: 8px;
+            background: #2d2d30;
+            border-right: 1px solid #252526;
             cursor: pointer;
             font-size: 13px;
             position: relative;
+            transition: background-color 0.1s;
+            user-select: none;
         }
 
         .tab.active {
             background: #1e1e1e;
+            border-bottom: 2px solid #007acc;
         }
 
         .tab:hover {
             background: #2a2d2e;
+        }
+
+        .tab.dragging {
+            opacity: 0.5;
+            cursor: move;
         }
 
         .tab.stdlib-tab {
@@ -146,25 +203,34 @@
             background: #3a3a3a;
         }
 
+        .tab-label {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .tab-close {
-            margin-left: 8px;
             width: 16px;
             height: 16px;
             border-radius: 3px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 16px;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: all 0.1s;
+            flex-shrink: 0;
         }
 
-        .tab:hover .tab-close {
-            opacity: 1;
+        .tab:hover .tab-close,
+        .tab.active .tab-close {
+            opacity: 0.6;
         }
 
         .tab-close:hover {
-            background: #3e3e42;
+            background: rgba(255, 255, 255, 0.1);
+            opacity: 1 !important;
         }
 
         .file-path-bar {
@@ -192,11 +258,14 @@
             flex: 1;
             position: relative;
             min-height: 400px;
+            display: flex;
+            flex-direction: column;
         }
 
-        #editor {
+        #editor, #editor2 {
             height: 100%;
             width: 100%;
+            flex: 1;
         }
 
         .file-item {
@@ -539,6 +608,7 @@
         .monaco-editor .decorationsOverviewRuler {
             z-index: 1;
         }
+
     </style>
 </head>
 <body>
@@ -573,14 +643,20 @@
                 </div>
                 <div class="sidebar-resizer" id="sidebarResizer"></div>
             </div>
-            <div class="editor-area">
-                <div class="tab-bar" id="tabBar"></div>
-                <div class="file-path-bar" id="filePathBar"></div>
-                <div class="editor-container">
-                    <div id="editor"></div>
-                    <button class="execute-button" id="executeButton" style="display: none;">Run</button>
+            <div class="editor-area" id="editorArea">
+                <div class="editor-group" id="editorGroup1">
+                    <div class="tab-bar" id="tabBar">
+                        <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor">
+                            <i class="codicon codicon-split-horizontal"></i>
+                        </button>
+                    </div>
+                    <div class="file-path-bar" id="filePathBar"></div>
+                    <div class="editor-container">
+                        <div id="editor"></div>
+                        <button class="execute-button" id="executeButton" style="display: none;">Run</button>
+                    </div>
+                    <div class="output-panel" id="outputPanel" style="display: none;"></div>
                 </div>
-                <div class="output-panel" id="outputPanel" style="display: none;"></div>
             </div>
         </div>
     </div>

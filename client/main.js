@@ -1,4 +1,12 @@
 import * as monaco from 'monaco-editor';
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+
+// Configure Monaco Editor environment
+self.MonacoEnvironment = {
+    getWorker() {
+        return new editorWorker();
+    }
+};
 
 class PythonIDE {
     constructor() {
@@ -17,12 +25,43 @@ class PythonIDE {
         this.selectedDirectory = ''; // Currently selected directory for context menu operations
         this.contextMenuTarget = null; // Target element for context menu
 
+        // Parse workspace folder from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        this.workspaceFolder = urlParams.get('folder') || '';
+
+        // Split view state
+        this.splitViewActive = false;
+        this.rightEditor = null;
+        this.rightOpenTabs = new Map();
+        this.rightActiveFile = null;
+        this.focusedEditor = 'left'; // 'left' or 'right' - tracks which editor has focus
+
         this.initializeEditor();
         this.initializeLanguageServer();
         this.loadSnippets();
         this.loadFileExplorer();
         this.setupEventListeners();
         this.initializeSidebarResize();
+    }
+
+    // Helper method to add workspace folder to requests
+    getFetchHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.workspaceFolder && this.workspaceFolder.trim() !== '') {
+            headers['x-workspace-folder'] = this.workspaceFolder;
+        }
+        return headers;
+    }
+
+    buildUrl(path, params = {}) {
+        const url = new URL(path, window.location.origin);
+        if (this.workspaceFolder && this.workspaceFolder.trim() !== '') {
+            url.searchParams.set('folder', this.workspaceFolder);
+        }
+        Object.entries(params).forEach(([key, value]) => {
+            url.searchParams.set(key, value);
+        });
+        return url.toString();
     }
 
     async initializeEditor() {
@@ -876,8 +915,14 @@ class PythonIDE {
 
     async loadFileExplorer() {
         try {
-            const response = await fetch('/api/files');
-            const files = await response.json();
+            const url = this.workspaceFolder
+                ? `/api/files?folder=${encodeURIComponent(this.workspaceFolder)}`
+                : '/api/files';
+            const response = await fetch(url);
+            const data = await response.json();
+
+            // Handle new response format
+            const files = data.files || data;
             this.renderFileExplorer(files);
 
             // Restore selected directory highlight after refresh
@@ -910,16 +955,8 @@ class PythonIDE {
                 element.setAttribute('data-type', 'directory');
                 element.setAttribute('draggable', 'true');
                 element.innerHTML = `
-                    <span class="folder-toggle">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M6 4l4 4-4 4V4z"/>
-                        </svg>
-                    </span>
-                    <span class="file-icon">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="#dcb67a" style="display: block;">
-                            <path d="M1.5 3v10h13V5.5H7L5.5 3h-4zm1 1h2.8l1.5 2.5h7.2v6.5h-11V4z"/>
-                        </svg>
-                    </span>
+                    <i class="codicon codicon-chevron-right folder-toggle"></i>
+                    <i class="codicon codicon-folder file-icon" style="color: #dcb67a;"></i>
                     <span>${item.name}</span>
                 `;
 
@@ -1019,6 +1056,26 @@ class PythonIDE {
             e.preventDefault();
             container.classList.remove('drag-over');
 
+            // 외부 파일/디렉토리 업로드
+            const items = e.dataTransfer.items;
+
+            if (items && items.length > 0) {
+                // Check if we can use the items API
+                let hasEntry = false;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].webkitGetAsEntry) {
+                        hasEntry = true;
+                        break;
+                    }
+                }
+
+                if (hasEntry) {
+                    await this.handleDroppedItems(items, '');
+                    return;
+                }
+            }
+
+            // Fallback for browsers that don't support items API
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 await this.handleFileUpload(files, '');
@@ -1080,7 +1137,26 @@ class PythonIDE {
                 return;
             }
 
-            // 외부 파일 업로드
+            // 외부 파일/디렉토리 업로드
+            const items = e.dataTransfer.items;
+
+            if (items && items.length > 0) {
+                // Check if we can use the items API
+                let hasEntry = false;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].webkitGetAsEntry) {
+                        hasEntry = true;
+                        break;
+                    }
+                }
+
+                if (hasEntry) {
+                    await this.handleDroppedItems(items, item.path);
+                    return;
+                }
+            }
+
+            // Fallback for browsers that don't support items API
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 await this.handleFileUpload(files, item.path);
@@ -1110,9 +1186,9 @@ class PythonIDE {
                 }
             }
 
-            const response = await fetch('/api/move', {
+            const response = await fetch(this.buildUrl('/api/move'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getFetchHeaders(),
                 body: JSON.stringify({
                     source: draggedItem.path,
                     destination: newPath
@@ -1153,22 +1229,101 @@ class PythonIDE {
         }
     }
 
-    async handleFileUpload(files, targetPath) {
+    async handleDroppedItems(items, targetPath) {
+        try {
+            const allFiles = [];
+
+            // Process all dropped items
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind === 'file') {
+                    const entry = item.webkitGetAsEntry();
+                    if (entry) {
+                        await this.traverseFileTree(entry, '', allFiles);
+                    }
+                }
+            }
+
+            if (allFiles.length === 0) {
+                return;
+            }
+
+            // Upload all collected files
+            await this.handleFileUpload(allFiles, targetPath);
+        } catch (error) {
+            alert('Failed to process dropped items: ' + error.message);
+        }
+    }
+
+    async traverseFileTree(item, path, allFiles) {
+        return new Promise((resolve, reject) => {
+            if (item.isFile) {
+                item.file((file) => {
+                    // Store file with its relative path
+                    allFiles.push({
+                        file: file,
+                        relativePath: path + file.name
+                    });
+                    resolve();
+                }, reject);
+            } else if (item.isDirectory) {
+                const dirReader = item.createReader();
+                const dirPath = path + item.name + '/';
+
+                const readEntries = () => {
+                    dirReader.readEntries(async (entries) => {
+                        if (entries.length === 0) {
+                            resolve();
+                            return;
+                        }
+
+                        // Process all entries in this directory
+                        for (const entry of entries) {
+                            await this.traverseFileTree(entry, dirPath, allFiles);
+                        }
+
+                        // Continue reading (readEntries returns max 100 entries at a time)
+                        readEntries();
+                    }, reject);
+                };
+
+                readEntries();
+            }
+        });
+    }
+
+    async handleFileUpload(filesOrArray, targetPath) {
         try {
             const formData = new FormData();
 
-            for (const file of files) {
-                formData.append('files', file);
+            // Handle both File[] and {file, relativePath}[] formats
+            if (Array.isArray(filesOrArray) && filesOrArray.length > 0 && filesOrArray[0].file) {
+                // Directory upload with relative paths
+                for (const item of filesOrArray) {
+                    formData.append('files', item.file);
+                    formData.append('relativePaths', item.relativePath);
+                }
+            } else {
+                // Simple file upload
+                for (const file of filesOrArray) {
+                    formData.append('files', file);
+                }
             }
+
             formData.append('targetPath', targetPath);
 
-            const response = await fetch('/api/upload', {
+            const url = (this.workspaceFolder && this.workspaceFolder.trim() !== '')
+                ? `/api/upload?folder=${encodeURIComponent(this.workspaceFolder)}`
+                : '/api/upload';
+
+            const response = await fetch(url, {
                 method: 'POST',
                 body: formData
             });
 
             if (!response.ok) {
-                throw new Error('Failed to upload files');
+                const errorText = await response.text();
+                throw new Error(`Failed to upload files: ${errorText}`);
             }
 
             const result = await response.json();
@@ -1194,74 +1349,76 @@ class PythonIDE {
         const ext = filename.split('.').pop()?.toLowerCase();
         const color = this.getFileIconColor(ext);
 
-        // SVG icon template
-        const svgIcon = (path, color = '#c5c5c5') => {
-            return `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}" style="display: block;">
-                ${path}
-            </svg>`;
+        // Use Codicon font icons (VSCode icons)
+        const icon = (glyph, iconColor = '#c5c5c5') => {
+            return `<i class="codicon codicon-${glyph}" style="color: ${iconColor}; font-size: 16px;"></i>`;
         };
 
         switch (ext) {
             case 'py':
-                return svgIcon('<path d="M7.5 1.5c-1.5 0-2.7.3-3.5.8-.8.5-1.2 1.2-1.2 2v2.2c0 .8.4 1.5 1.2 2 .8.5 2 .8 3.5.8s2.7-.3 3.5-.8c.8-.5 1.2-1.2 1.2-2V4.3c0-.8-.4-1.5-1.2-2-.8-.5-2-.8-3.5-.8zm0 1c1.3 0 2.4.2 3 .6.6.4.8.8.8 1.2 0 .4-.2.8-.8 1.2-.6.4-1.7.6-3 .6s-2.4-.2-3-.6c-.6-.4-.8-.8-.8-1.2 0-.4.2-.8.8-1.2.6-.4 1.7-.6 3-.6zm-3.8 5.2c.8.5 2 .8 3.8.8s3-.3 3.8-.8v1.8c0 .4-.2.8-.8 1.2-.6.4-1.7.6-3 .6s-2.4-.2-3-.6c-.6-.4-.8-.8-.8-1.2V7.7zm0 3.5c.8.5 2 .8 3.8.8s3-.3 3.8-.8v1.8c0 .4-.2.8-.8 1.2-.6.4-1.7.6-3 .6s-2.4-.2-3-.6c-.6-.4-.8-.8-.8-1.2v-1.8z"/>', '#6b9bd2');
-            case 'js': case 'jsx':
-                return svgIcon('<path d="M2.5 2.5h11v11h-11v-11zm1 1v9h9v-9h-9zm2 2h1v5h-1v-5zm3 0h1v3.5c0 .3-.1.5-.3.7-.2.2-.4.3-.7.3h-.5v-1h.5v-3.5z"/>', '#f0db4f');
-            case 'ts': case 'tsx':
-                return svgIcon('<path d="M2.5 2.5h11v11h-11v-11zm1 1v9h9v-9h-9zm2 2h4v1h-1.5v4h-1v-4h-1.5v-1zm5 0h1v5h-1v-5z"/>', '#519aba');
+                return icon('symbol-method', '#4b8bbe');
+            case 'js':
+                return icon('symbol-method', '#f0db4f');
+            case 'jsx':
+                return icon('react', '#61dafb');
+            case 'ts':
+                return icon('symbol-method', '#3178c6');
+            case 'tsx':
+                return icon('react', '#3178c6');
             case 'json':
-                return svgIcon('<path d="M5 3.5h-.5c-.3 0-.5.2-.5.5v1.5c0 .3-.2.5-.5.5h-.5v1h.5c.3 0 .5.2.5.5v1.5c0 .3.2.5.5.5h.5v-1h-.5v-1.5c0-.5-.2-.9-.5-1.2.3-.3.5-.7.5-1.2v-1.5h.5v-1zm6 0h.5c.3 0 .5.2.5.5v1.5c0 .3.2.5.5.5h.5v1h-.5c-.3 0-.5.2-.5.5v1.5c0 .3-.2.5-.5.5h-.5v-1h.5v-1.5c0-.5.2-.9.5-1.2-.3-.3-.5-.7-.5-1.2v-1.5h-.5v-1z"/>', '#c5c5c5');
+                return icon('json', '#f0db4f');
             case 'html': case 'htm':
-                return svgIcon('<path d="M2 2.5v11h12v-11h-12zm1 1h10v9h-10v-9zm2 2v1h1v2h1v-2h1v-1h-3zm4 0v3h3v-1h-2v-.5h2v-1h-2v-.5h2v-1h-3z"/>', '#e65c5c');
+                return icon('code', '#e34c26');
             case 'css': case 'scss': case 'sass':
-                return svgIcon('<path d="M2.5 2.5v11h11v-11h-11zm1 1h9v9h-9v-9zm2 2v1h4v1h-3v3h4v-1h-3v-1h3v-3h-5z"/>', '#5d8fdb');
+                return icon('symbol-color', '#5d8fdb');
             case 'md': case 'markdown':
-                return svgIcon('<path d="M2 4.5v7h12v-7h-12zm1 1h10v5h-10v-5zm1.5 1v3l1-1.5 1 1.5v-3h1v3h1l1.5-1.5v1.5h1v-3h-7.5z"/>', '#c5c5c5');
+                return icon('markdown', '#c5c5c5');
             case 'txt':
-                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4 3h5v1h-5v-1zm0 2h5v1h-5v-1z"/>', '#c5c5c5');
+                return icon('file', '#c5c5c5');
             case 'yml': case 'yaml': case 'config': case 'conf':
-                return svgIcon('<path d="M2 2.5v11h12v-11h-12zm1 1h10v9h-10v-9zm2 1v1h1v-1h-1zm2 0v1h4v-1h-4zm-2 2v1h1v-1h-1zm2 0v1h4v-1h-4zm-2 2v1h1v-1h-1zm2 0v1h4v-1h-4z"/>', '#e65c5c');
+                return icon('settings-gear', '#e65c5c');
             case 'xml':
-                return svgIcon('<path d="M3 3v10h10v-10h-10zm1 1h8v8h-8v-8zm1 2l1.5 2-1.5 2h1l1-1.3 1 1.3h1l-1.5-2 1.5-2h-1l-1 1.3-1-1.3h-1z"/>', '#c5c5c5');
+                return icon('code', '#c5c5c5');
             case 'csv':
-                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4 3v4h5v-4h-5zm1 1h1v2h-1v-2zm2 0h1v2h-1v-2z"/>', '#4db380');
+                return icon('table', '#4db380');
             case 'log':
-                return svgIcon('<path d="M3.5 2.5v11h9v-11h-9zm1 1h7v9h-7v-9zm1 2v1h5v-1h-5zm0 2v1h4v-1h-4zm0 2v1h5v-1h-5z"/>', '#c5c5c5');
+                return icon('output', '#c5c5c5');
             case 'sql':
-                return svgIcon('<path d="M8 3c-2.2 0-4 .7-4 1.5v7c0 .8 1.8 1.5 4 1.5s4-.7 4-1.5v-7c0-.8-1.8-1.5-4-1.5zm0 1c1.7 0 3 .4 3 .5s-1.3.5-3 .5-3-.4-3-.5 1.3-.5 3-.5zm-3 2.2c.8.5 1.8.8 3 .8s2.2-.3 3-.8v1.3c0 .1-1.3.5-3 .5s-3-.4-3-.5v-1.3zm0 2.5c.8.5 1.8.8 3 .8s2.2-.3 3-.8v1.3c0 .1-1.3.5-3 .5s-3-.4-3-.5v-1.3z"/>', '#c5c5c5');
+                return icon('database', '#c5c5c5');
             case 'sh': case 'bash':
-                return svgIcon('<path d="M2 4v8h12v-8h-12zm1 1h10v6h-10v-6zm1.5 1.5v1h1v-1h-1zm2 0v1h4v-1h-4zm-2 2v1h3v-1h-3zm4 0v1h2v-1h-2z"/>', '#6bc267');
+                return icon('terminal-bash', '#6bc267');
             case 'php':
-                return svgIcon('<path d="M2 5v6h12v-6h-12zm1 1h10v4h-10v-4zm1 1v2h1.5c.3 0 .5-.2.5-.5v-1c0-.3-.2-.5-.5-.5h-1.5zm3 0v2h1v-1.5h.5v1.5h1v-2h-2.5zm3 0v2h1.5c.3 0 .5-.2.5-.5v-1c0-.3-.2-.5-.5-.5h-1.5zm-5 .5h.5v1h-.5v-1zm5 0h.5v1h-.5v-1z"/>', '#9b7cc4');
+                return icon('symbol-method', '#9b7cc4');
             case 'java':
-                return svgIcon('<path d="M6 3c-.5 1-.5 2-.5 2s1 1 2.5 1 2.5-1 2.5-1-.1-1-.5-2c-.3.5-1 1-2 1s-1.7-.5-2-1zm-1 4c0 1 .5 2 1.5 2.5-.5.5-.5 1-.5 1s1 .5 2 .5 2-.5 2-.5-.1-.5-.5-1c1-.5 1.5-1.5 1.5-2.5 0 0-1 1-3 1s-3-1-3-1zm1 4.5s0 1 2 1.5c2-.5 2-1.5 2-1.5s-1 .5-2 .5-2-.5-2-.5z"/>', '#5d9bd6');
+                return icon('symbol-method', '#5d9bd6');
             case 'c': case 'cpp': case 'h':
-                return svgIcon('<path d="M8 3c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 1c2.2 0 4 1.8 4 4s-1.8 4-4 4-4-1.8-4-4 1.8-4 4-4zm-1.5 2v1.5h-1v1h1v1.5h1v-1.5h1v-1h-1v-1.5h-1z"/>', '#5d9bd6');
+                return icon('file-code', '#5d9bd6');
             case 'go':
-                return svgIcon('<path d="M3 6c-.5 0-1 .5-1 1v2c0 .5.5 1 1 1h2c.5 0 1-.5 1-1v-2c0-.5-.5-1-1-1h-2zm5 0v1h5v-1h-5zm-5 1h2v2h-2v-2zm5 1v1h3v-1h-3z"/>', '#5dc9e2');
+                return icon('symbol-method', '#5dc9e2');
             case 'rs':
-                return svgIcon('<path d="M8 3l-5 2.5v5l5 2.5 5-2.5v-5l-5-2.5zm0 1.5l3.5 1.8v3.4l-3.5 1.8-3.5-1.8v-3.4l3.5-1.8z"/>', '#e6b8a2');
+                return icon('file-code', '#e6b8a2');
             case 'swift':
-                return svgIcon('<path d="M3 4c-.5 0-1 .5-1 1v6c0 .5.5 1 1 1h10c.5 0 1-.5 1-1v-6c0-.5-.5-1-1-1h-10zm0 1h10v6h-10v-6zm2 1.5c-.3.3-.5.7-.5 1.5 0 1.1.9 2 2 2 .4 0 .8-.1 1-.3.3.2.7.3 1 .3 1.1 0 2-.9 2-2s-.9-2-2-2c-.3 0-.7.1-1 .3-.2-.2-.6-.3-1-.3-.8 0-1.2.2-1.5.5z"/>', '#f27b5b');
+                return icon('symbol-method', '#f27b5b');
             case 'kt': case 'kts':
-                return svgIcon('<path d="M3 3v10h10v-10h-10zm1 1h8l-4 4-4 4v-8zm0 8l4-4 4 4h-8z"/>', '#a87dff');
+                return icon('file-code', '#a87dff');
             case 'rb':
-                return svgIcon('<path d="M8 2l-6 3v6l6 3 6-3v-6l-6-3zm0 1.5l4.5 2.2v4.6l-4.5 2.2-4.5-2.2v-4.6l4.5-2.2z"/>', '#e65c5c');
+                return icon('ruby', '#e65c5c');
             case 'env':
-                return svgIcon('<path d="M8 3c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 1c2.2 0 4 1.8 4 4s-1.8 4-4 4-4-1.8-4-4 1.8-4 4-4zm-1 2v1h-1v2h1v1h2v-1h1v-2h-1v-1h-2zm1 1v2h-1v-2h1z"/>', '#ffd966');
+                return icon('symbol-key', '#ffd966');
             case 'dockerfile':
-                return svgIcon('<path d="M2 6v6h12v-6h-12zm1 1h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1zm-9 2h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1z"/>', '#4db3e8');
+                return icon('file-code', '#4db3e8');
             case 'gitignore':
-                return svgIcon('<path d="M3 3v10h10v-10h-10zm1 1h8v8h-8v-8zm2 2v1h4v-1h-4zm0 2v1h3v-1h-3z"/>', '#c5c5c5');
+                return icon('diff-ignored', '#c5c5c5');
             case 'lock':
-                return svgIcon('<path d="M8 2c-1.1 0-2 .9-2 2v2h-1v6h6v-6h-1v-2c0-1.1-.9-2-2-2zm0 1c.6 0 1 .4 1 1v2h-2v-2c0-.6.4-1 1-1zm-2 4h4v4h-4v-4zm2 1v2h1v-2h-1z"/>', '#c5c5c5');
+                return icon('lock', '#c5c5c5');
             case 'zip': case 'tar': case 'gz':
-                return svgIcon('<path d="M6 2v1h1v1h-1v1h1v1h-1v1h1v1h-1v1h1v1h-1v2c0 .5.5 1 1 1h4c.5 0 1-.5 1-1v-8l-3-3h-3zm1 1h2v1h-2v-1zm3 0v2h2l-2-2zm-3 2h2v1h-2v-1zm0 2h2v1h-2v-1zm-1 2h6v2h-6v-2z"/>', '#c5c5c5');
+                return icon('file-zip', '#c5c5c5');
             case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg':
-                return svgIcon('<path d="M2 3v10h12v-10h-12zm1 1h10v8h-10v-8zm1 1v6l2-2 1 1 2-2 2 2v-5h-7zm1.5 1c.3 0 .5.2.5.5s-.2.5-.5.5-.5-.2-.5-.5.2-.5.5-.5z"/>', '#c58ae0');
+                return icon('file-media', '#c58ae0');
             case 'pdf':
-                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4 3.5c.3 0 .5.2.5.5s-.2.5-.5.5h-.5v1h-.5v-2.5h1zm2 0v2.5h-.5v-1h-.5v1h-.5v-2.5h1.5zm2 0c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5h-1v-2.5h1zm-3.5.5v.5h.5v-.5h-.5zm2 0v1.5h.5v-1.5h-.5z"/>', '#f46060');
+                return icon('file-pdf', '#f46060');
             default:
-                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4.5 3h5v1h-5v-1zm0 2h5v1h-5v-1z"/>', '#c5c5c5');
+                return icon('file', '#c5c5c5');
         }
     }
 
@@ -1282,9 +1439,29 @@ class PythonIDE {
 
     async openFile(filepath) {
         try {
-            if (this.openTabs.has(filepath)) {
-                this.switchToTab(filepath);
-                return;
+            // If split view is active, open in focused editor
+            if (this.splitViewActive) {
+                if (this.focusedEditor === 'right') {
+                    // Open in right editor
+                    if (this.rightOpenTabs.has(filepath)) {
+                        this.switchToTabInSplit(filepath);
+                        return;
+                    }
+                    await this.openFileInSplit(filepath);
+                    return;
+                } else {
+                    // Open in left editor (default)
+                    if (this.openTabs.has(filepath)) {
+                        this.switchToTab(filepath);
+                        return;
+                    }
+                }
+            } else {
+                // No split view, check if already open
+                if (this.openTabs.has(filepath)) {
+                    this.switchToTab(filepath);
+                    return;
+                }
             }
 
             let response, data;
@@ -1302,7 +1479,7 @@ class PythonIDE {
                 data = await response.json();
             } else {
                 // Regular workspace file
-                response = await fetch(`/api/files/${filepath}`);
+                response = await fetch(this.buildUrl(`/api/files/${filepath}`));
 
                 if (!response.ok) {
                     throw new Error(`Failed to load file: ${filepath}`);
@@ -1357,20 +1534,64 @@ class PythonIDE {
         tab.className = 'tab';
         tab.dataset.filepath = filepath;
         tab.innerHTML = `
-            <span>${filename}${isStdlib ? ' (read-only)' : ''}</span>
-            <span class="tab-close">×</span>
+            <span class="tab-label">${filename}${isStdlib ? ' (read-only)' : ''}</span>
+            <i class="codicon codicon-close tab-close"></i>
         `;
 
         if (isStdlib) {
             tab.classList.add('stdlib-tab');
         }
 
+        // Make tab draggable
+        tab.setAttribute('draggable', 'true');
+
+        // Tab click handler
         tab.addEventListener('click', (e) => {
             if (e.target.classList.contains('tab-close')) {
                 this.closeTab(filepath);
             } else {
+                this.focusedEditor = 'left';
                 this.switchToTab(filepath);
+                if (this.splitViewActive) {
+                    this.updateEditorFocusVisual();
+                }
             }
+        });
+
+        // Tab drag handlers for reordering
+        tab.addEventListener('dragstart', (e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', filepath);
+            e.dataTransfer.setData('editor-group', 'left');
+            tab.classList.add('dragging');
+        });
+
+        tab.addEventListener('dragend', (e) => {
+            tab.classList.remove('dragging');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+        });
+
+        tab.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const draggingTab = document.querySelector('.tab.dragging');
+            if (draggingTab && draggingTab !== tab && draggingTab.closest('#tabBar')) {
+                const rect = tab.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+
+                if (e.clientX < midpoint) {
+                    tab.parentNode.insertBefore(draggingTab, tab);
+                } else {
+                    tab.parentNode.insertBefore(draggingTab, tab.nextSibling);
+                }
+            }
+        });
+
+        // Tab right-click context menu
+        tab.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showTabContextMenu(e, filepath);
         });
 
         this.tabBar.appendChild(tab);
@@ -1437,11 +1658,9 @@ class PythonIDE {
 
         try {
             const content = tabData.model.getValue();
-            await fetch(`/api/files/${filepath}`, {
+            await fetch(this.buildUrl(`/api/files/${filepath}`), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: this.getFetchHeaders(),
                 body: JSON.stringify({ content })
             });
 
@@ -1451,19 +1670,25 @@ class PythonIDE {
         }
     }
 
-    async executeCode() {
-        if (!this.activeFile || !this.activeFile.endsWith('.py')) return;
+    async executeCode(editorGroup = 'left') {
+        const activeFile = editorGroup === 'left' ? this.activeFile : this.rightActiveFile;
+        const openTabs = editorGroup === 'left' ? this.openTabs : this.rightOpenTabs;
+        const outputPanel = editorGroup === 'left' ? this.outputPanel : document.getElementById('outputPanel2');
 
-        const tabData = this.openTabs.get(this.activeFile);
+        if (!activeFile || !activeFile.endsWith('.py')) return;
+
+        const tabData = openTabs.get(activeFile);
         if (!tabData) return;
 
         const code = tabData.model.getValue();
-        const filename = this.activeFile.split('/').pop();
+        const filename = activeFile.split('/').pop();
 
         try {
-            this.outputPanel.style.display = 'block';
-            this.outputPanel.className = 'output-panel';
-            this.outputPanel.textContent = 'Executing...';
+            if (outputPanel) {
+                outputPanel.style.display = 'block';
+                outputPanel.className = 'output-panel';
+                outputPanel.textContent = 'Executing...';
+            }
 
             const response = await fetch('/api/execute', {
                 method: 'POST',
@@ -1475,15 +1700,19 @@ class PythonIDE {
 
             const result = await response.json();
 
-            if (result.success) {
-                this.outputPanel.textContent = result.output || 'Code executed successfully (no output)';
-            } else {
-                this.outputPanel.className = 'output-panel error';
-                this.outputPanel.textContent = result.error || 'Execution failed';
+            if (outputPanel) {
+                if (result.success) {
+                    outputPanel.textContent = result.output || 'Code executed successfully (no output)';
+                } else {
+                    outputPanel.className = 'output-panel error';
+                    outputPanel.textContent = result.error || 'Execution failed';
+                }
             }
         } catch (error) {
-            this.outputPanel.className = 'output-panel error';
-            this.outputPanel.textContent = 'Failed to execute code: ' + error.message;
+            if (outputPanel) {
+                outputPanel.className = 'output-panel error';
+                outputPanel.textContent = 'Failed to execute code: ' + error.message;
+            }
         }
     }
 
@@ -1514,8 +1743,16 @@ class PythonIDE {
 
     setupEventListeners() {
         this.executeButton.addEventListener('click', () => {
-            this.executeCode();
+            this.executeCode('left');
         });
+
+        // Split toggle button
+        const splitToggleBtn = document.getElementById('splitToggleBtn');
+        if (splitToggleBtn) {
+            splitToggleBtn.addEventListener('click', () => {
+                this.toggleSplit();
+            });
+        }
 
         // Explorer actions
         document.getElementById('newFileBtn').addEventListener('click', () => {
@@ -1644,11 +1881,9 @@ class PythonIDE {
             `#!/usr/bin/env python3\n\"\"\"\n${filename} - Description\n\"\"\"\n\n\ndef main():\n    pass\n\n\nif __name__ == "__main__":\n    main()\n` :
             '';
 
-        const response = await fetch(`/api/files/${filename}`, {
+        const response = await fetch(this.buildUrl(`/api/files/${filename}`), {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: this.getFetchHeaders(),
             body: JSON.stringify({ content })
         });
 
@@ -1659,11 +1894,9 @@ class PythonIDE {
 
     async createFolder(foldername) {
         // Create folder using mkdir API
-        const response = await fetch('/api/mkdir', {
+        const response = await fetch(this.buildUrl('/api/mkdir'), {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: this.getFetchHeaders(),
             body: JSON.stringify({ path: foldername })
         });
 
@@ -1760,6 +1993,607 @@ class PythonIDE {
             document.removeEventListener('mouseup', handleMouseUp);
         };
     }
+
+    showTabContextMenu(event, filepath, editorGroup = 'left') {
+        this.closeContextMenu();
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.left = event.pageX + 'px';
+        menu.style.top = event.pageY + 'px';
+
+        const filename = filepath.split('/').pop();
+        const tabData = editorGroup === 'left' ? this.openTabs.get(filepath) : this.rightOpenTabs.get(filepath);
+        const isStdlib = tabData?.isStdlib || false;
+
+        const closeAction = editorGroup === 'left' ? () => this.closeTab(filepath) : () => this.closeTabInSplit(filepath);
+        const closeOthersAction = editorGroup === 'left' ? () => this.closeOtherTabs(filepath) : () => this.closeOtherTabsInSplit(filepath);
+        const closeAllAction = editorGroup === 'left' ? () => this.closeAllTabs() : () => this.closeAllTabsInSplit();
+        const closeRightAction = editorGroup === 'left' ? () => this.closeTabsToRight(filepath) : () => this.closeTabsToRightInSplit(filepath);
+
+        const menuItems = [
+            { text: 'Close', action: closeAction },
+            { text: 'Close Others', action: closeOthersAction },
+            { text: 'Close All', action: closeAllAction },
+            { text: 'Close Tabs to the Right', action: closeRightAction },
+            { separator: true },
+            { text: 'Copy File Name', action: () => this.copyToClipboard(filename) },
+            { text: 'Copy Path', action: () => this.copyToClipboard(filepath) },
+            { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filepath}`) },
+        ];
+
+        // Add download option only for non-stdlib files
+        if (!isStdlib) {
+            menuItems.push(
+                { separator: true },
+                { text: 'Download', action: () => this.downloadItem(filepath) }
+            );
+        }
+
+        menuItems.forEach(item => {
+            if (item.separator) {
+                const separator = document.createElement('div');
+                separator.className = 'context-menu-separator';
+                menu.appendChild(separator);
+            } else {
+                const menuItem = document.createElement('div');
+                menuItem.className = `context-menu-item ${item.class || ''}`;
+                menuItem.textContent = item.text;
+                menuItem.addEventListener('click', () => {
+                    item.action();
+                    this.closeContextMenu();
+                });
+                menu.appendChild(menuItem);
+            }
+        });
+
+        document.body.appendChild(menu);
+
+        // Close menu when clicking outside
+        setTimeout(() => {
+            document.addEventListener('click', this.closeContextMenu.bind(this), { once: true });
+        }, 0);
+    }
+
+    closeOtherTabs(keepFilepath) {
+        const allTabs = Array.from(document.querySelectorAll('.tab'));
+        allTabs.forEach(tab => {
+            const filepath = tab.dataset.filepath;
+            if (filepath !== keepFilepath) {
+                this.closeTab(filepath);
+            }
+        });
+    }
+
+    closeAllTabs() {
+        const allTabs = Array.from(document.querySelectorAll('.tab'));
+        allTabs.forEach(tab => {
+            this.closeTab(tab.dataset.filepath);
+        });
+    }
+
+    closeTabsToRight(fromFilepath) {
+        const allTabs = Array.from(document.querySelectorAll('.tab'));
+        const fromIndex = allTabs.findIndex(tab => tab.dataset.filepath === fromFilepath);
+
+        if (fromIndex !== -1) {
+            for (let i = fromIndex + 1; i < allTabs.length; i++) {
+                this.closeTab(allTabs[i].dataset.filepath);
+            }
+        }
+    }
+
+
+    setupSplitResize(divider, leftGroup, rightGroup) {
+        let isDragging = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+
+        divider.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startLeftWidth = leftGroup.offsetWidth;
+            startRightWidth = rightGroup.offsetWidth;
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const delta = e.clientX - startX;
+            const newLeftWidth = startLeftWidth + delta;
+            const newRightWidth = startRightWidth - delta;
+            const totalWidth = startLeftWidth + startRightWidth;
+
+            if (newLeftWidth > 200 && newRightWidth > 200) {
+                const leftPercent = (newLeftWidth / totalWidth) * 100;
+                const rightPercent = (newRightWidth / totalWidth) * 100;
+
+                leftGroup.style.flex = `0 0 ${leftPercent}%`;
+                rightGroup.style.flex = `0 0 ${rightPercent}%`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = '';
+            }
+        });
+    }
+
+    async openFileInSplit(filepath) {
+        if (!this.splitViewActive || !this.rightEditor) return;
+
+        try {
+            // Check if already open in right editor
+            if (this.rightOpenTabs.has(filepath)) {
+                this.switchToTabInSplit(filepath);
+                return;
+            }
+
+            // Load file content
+            const response = await fetch(this.buildUrl(`/api/files/${filepath}`));
+            if (!response.ok) throw new Error(`Failed to load file: ${filepath}`);
+
+            const data = await response.json();
+
+            const model = monaco.editor.createModel(
+                data.content,
+                this.getLanguageFromFile(filepath),
+                monaco.Uri.file(filepath + '_split')
+            );
+
+            this.rightOpenTabs.set(filepath, {
+                model,
+                saved: true,
+                isStdlib: filepath.startsWith('/usr/local/lib/python3.11/')
+            });
+
+            this.createTabInSplit(filepath);
+            this.switchToTabInSplit(filepath);
+
+        } catch (error) {
+            alert(`Could not open file: ${filepath.split('/').pop()}\nError: ${error.message}`);
+        }
+    }
+
+    createTabInSplit(filepath) {
+        const filename = filepath.split('/').pop();
+        const tabBar2 = document.getElementById('tabBar2');
+        const isStdlib = filepath.startsWith('/usr/local/lib/python3.11/');
+
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.dataset.filepath = filepath;
+        tab.innerHTML = `
+            <span class="tab-label">${filename}${isStdlib ? ' (read-only)' : ''}</span>
+            <i class="codicon codicon-close tab-close"></i>
+        `;
+
+        if (isStdlib) {
+            tab.classList.add('stdlib-tab');
+        }
+
+        // Make tab draggable
+        tab.setAttribute('draggable', 'true');
+
+        tab.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) {
+                this.closeTabInSplit(filepath);
+            } else {
+                this.focusedEditor = 'right';
+                this.switchToTabInSplit(filepath);
+                this.updateEditorFocusVisual();
+            }
+        });
+
+        // Tab drag handlers
+        tab.addEventListener('dragstart', (e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', filepath);
+            e.dataTransfer.setData('editor-group', 'right');
+            tab.classList.add('dragging');
+        });
+
+        tab.addEventListener('dragend', (e) => {
+            tab.classList.remove('dragging');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+        });
+
+        tab.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const draggingTab = document.querySelector('.tab.dragging');
+            if (draggingTab && draggingTab !== tab && draggingTab.closest('#tabBar2')) {
+                const rect = tab.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+
+                if (e.clientX < midpoint) {
+                    tab.parentNode.insertBefore(draggingTab, tab);
+                } else {
+                    tab.parentNode.insertBefore(draggingTab, tab.nextSibling);
+                }
+            }
+        });
+
+        // Tab right-click context menu
+        tab.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showTabContextMenu(e, filepath, 'right');
+        });
+
+        tabBar2.appendChild(tab);
+    }
+
+    switchToTabInSplit(filepath) {
+        // Update active tab styling
+        document.querySelectorAll('#tabBar2 .tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        const tab = document.querySelector(`#tabBar2 [data-filepath="${filepath}"]`);
+        if (tab) {
+            tab.classList.add('active');
+        }
+
+        // Switch editor model
+        const tabData = this.rightOpenTabs.get(filepath);
+        if (tabData && this.rightEditor) {
+            this.rightEditor.setModel(tabData.model);
+            this.rightActiveFile = filepath;
+
+            // Update file path display
+            const filePathBar2 = document.getElementById('filePathBar2');
+            if (filePathBar2) {
+                filePathBar2.textContent = filepath;
+            }
+
+            // Show execute button for Python files (not for stdlib files)
+            const executeButton2 = document.getElementById('executeButton2');
+            if (executeButton2) {
+                const isPython = filepath.endsWith('.py');
+                executeButton2.style.display = (isPython && !tabData.isStdlib) ? 'block' : 'none';
+            }
+        }
+    }
+
+    closeTabInSplit(filepath) {
+        const tabData = this.rightOpenTabs.get(filepath);
+        if (tabData) {
+            tabData.model.dispose();
+            this.rightOpenTabs.delete(filepath);
+        }
+
+        const tab = document.querySelector(`#tabBar2 [data-filepath="${filepath}"]`);
+        if (tab) {
+            tab.remove();
+        }
+
+        // If no more tabs, close split view
+        if (this.rightOpenTabs.size === 0) {
+            this.closeSplitView();
+        } else if (this.rightActiveFile === filepath) {
+            // Switch to another tab
+            const remainingTabs = document.querySelectorAll('#tabBar2 .tab');
+            if (remainingTabs.length > 0) {
+                this.switchToTabInSplit(remainingTabs[0].dataset.filepath);
+            }
+        }
+    }
+
+    closeOtherTabsInSplit(keepFilepath) {
+        const allTabs = Array.from(document.querySelectorAll('#tabBar2 .tab'));
+        allTabs.forEach(tab => {
+            const filepath = tab.dataset.filepath;
+            if (filepath !== keepFilepath) {
+                this.closeTabInSplit(filepath);
+            }
+        });
+    }
+
+    closeAllTabsInSplit() {
+        const allTabs = Array.from(document.querySelectorAll('#tabBar2 .tab'));
+        allTabs.forEach(tab => {
+            this.closeTabInSplit(tab.dataset.filepath);
+        });
+    }
+
+    closeTabsToRightInSplit(fromFilepath) {
+        const allTabs = Array.from(document.querySelectorAll('#tabBar2 .tab'));
+        const fromIndex = allTabs.findIndex(tab => tab.dataset.filepath === fromFilepath);
+
+        if (fromIndex !== -1) {
+            for (let i = fromIndex + 1; i < allTabs.length; i++) {
+                this.closeTabInSplit(allTabs[i].dataset.filepath);
+            }
+        }
+    }
+
+    closeSplitView(mergeTabsToLeft = false) {
+        if (!this.splitViewActive) return;
+
+        // Merge right tabs to left if requested
+        if (mergeTabsToLeft) {
+            this.rightOpenTabs.forEach((tabData, filepath) => {
+                // Check if tab is not already open in left editor
+                if (!this.openTabs.has(filepath)) {
+                    // Create new model for left editor (don't reuse right model)
+                    const newModel = monaco.editor.createModel(
+                        tabData.model.getValue(),
+                        tabData.model.getLanguageId(),
+                        monaco.Uri.file(filepath)
+                    );
+                    this.openTabs.set(filepath, {
+                        model: newModel,
+                        saved: tabData.saved,
+                        isStdlib: tabData.isStdlib
+                    });
+                    this.createTab(filepath);
+                }
+            });
+        }
+
+        // Dispose right editor
+        if (this.rightEditor) {
+            this.rightEditor.dispose();
+            this.rightEditor = null;
+        }
+
+        // Dispose all right tab models
+        this.rightOpenTabs.forEach(tabData => {
+            tabData.model.dispose();
+        });
+        this.rightOpenTabs.clear();
+        this.rightActiveFile = null;
+
+        // Remove right group and divider
+        const rightGroup = document.getElementById('editorGroup2');
+        const divider = document.getElementById('splitDivider');
+        const leftGroup = document.getElementById('editorGroup1');
+
+        if (rightGroup) rightGroup.remove();
+        if (divider) divider.remove();
+        if (leftGroup) {
+            leftGroup.classList.remove('split');
+            leftGroup.style.flex = '1';
+        }
+
+        this.splitViewActive = false;
+        this.focusedEditor = 'left';
+
+        // Update split button icon
+        this.updateSplitButtonIcon();
+    }
+
+    toggleSplit() {
+        if (this.splitViewActive) {
+            // Close split view and merge all tabs to left
+            this.closeSplitView(true);
+        } else {
+            // Create split view
+            this.createSplitView();
+        }
+    }
+
+    createSplitView() {
+        if (this.splitViewActive) return;
+
+        const editorArea = document.getElementById('editorArea');
+        const leftGroup = document.getElementById('editorGroup1');
+
+        // Create divider
+        const divider = document.createElement('div');
+        divider.className = 'split-divider';
+        divider.id = 'splitDivider';
+
+        // Create right editor group
+        const rightGroup = document.createElement('div');
+        rightGroup.className = 'editor-group';
+        rightGroup.id = 'editorGroup2';
+        rightGroup.innerHTML = `
+            <div class="tab-bar" id="tabBar2"></div>
+            <div class="file-path-bar" id="filePathBar2"></div>
+            <div class="editor-container">
+                <div id="editor2"></div>
+                <button class="execute-button" id="executeButton2" style="display: none;">Run</button>
+            </div>
+            <div class="output-panel" id="outputPanel2" style="display: none;"></div>
+        `;
+
+        // Add to DOM
+        leftGroup.classList.add('split');
+        editorArea.appendChild(divider);
+        editorArea.appendChild(rightGroup);
+
+        // Initialize right editor
+        this.rightEditor = monaco.editor.create(document.getElementById('editor2'), {
+            value: '# Click here and open a file to edit',
+            language: 'python',
+            theme: 'vs-dark',
+            fontSize: 14,
+            lineNumbers: 'on',
+            minimap: { enabled: false },
+            automaticLayout: true,
+            scrollBeyondLastLine: false,
+            wordWrap: 'on',
+            folding: true,
+            foldingStrategy: 'indentation',
+            showFoldingControls: 'always',
+            tabSize: 4,
+            insertSpaces: true,
+            autoIndent: 'full',
+            formatOnPaste: true,
+            formatOnType: true,
+            bracketPairColorization: {
+                enabled: true
+            }
+        });
+
+        this.splitViewActive = true;
+
+        // Setup divider resize
+        this.setupSplitResize(divider, leftGroup, rightGroup);
+
+        // Setup execute button for right editor
+        const executeButton2 = document.getElementById('executeButton2');
+        if (executeButton2) {
+            executeButton2.addEventListener('click', () => {
+                this.executeCode('right');
+            });
+        }
+
+        // Setup editor focus tracking
+        this.setupEditorFocusTracking();
+
+        // Setup tab bar drop zones for cross-editor tab movement
+        this.setupTabBarDropZones();
+
+        // Update split button icon
+        this.updateSplitButtonIcon();
+    }
+
+    setupTabBarDropZones() {
+        const leftTabBar = document.getElementById('tabBar');
+        const rightTabBar = document.getElementById('tabBar2');
+
+        if (leftTabBar) {
+            this.setupTabBarDrop(leftTabBar, 'left');
+        }
+
+        if (rightTabBar) {
+            this.setupTabBarDrop(rightTabBar, 'right');
+        }
+    }
+
+    setupTabBarDrop(tabBar, targetEditor) {
+        tabBar.addEventListener('dragover', (e) => {
+            const draggingTab = document.querySelector('.tab.dragging');
+            if (draggingTab) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                tabBar.style.background = 'rgba(0, 122, 204, 0.1)';
+            }
+        });
+
+        tabBar.addEventListener('dragleave', (e) => {
+            if (e.target === tabBar) {
+                tabBar.style.background = '';
+            }
+        });
+
+        tabBar.addEventListener('drop', (e) => {
+            e.preventDefault();
+            tabBar.style.background = '';
+
+            const filepath = e.dataTransfer.getData('text/plain');
+            const sourceEditor = e.dataTransfer.getData('editor-group');
+
+            if (!filepath) return;
+
+            // Move tab between editors
+            if (sourceEditor !== targetEditor) {
+                this.moveTabBetweenEditors(filepath, sourceEditor, targetEditor);
+            }
+        });
+    }
+
+    async moveTabBetweenEditors(filepath, fromEditor, toEditor) {
+        const sourceTabs = fromEditor === 'left' ? this.openTabs : this.rightOpenTabs;
+        const targetTabs = toEditor === 'left' ? this.openTabs : this.rightOpenTabs;
+
+        const tabData = sourceTabs.get(filepath);
+        if (!tabData) return;
+
+        // Create new model for target editor
+        const newModel = monaco.editor.createModel(
+            tabData.model.getValue(),
+            tabData.model.getLanguageId(),
+            monaco.Uri.file(filepath + (toEditor === 'right' ? '_split' : ''))
+        );
+
+        // Add to target editor
+        targetTabs.set(filepath, {
+            model: newModel,
+            saved: tabData.saved,
+            isStdlib: tabData.isStdlib
+        });
+
+        // Remove from source editor
+        if (fromEditor === 'left') {
+            this.closeTab(filepath);
+        } else {
+            this.closeTabInSplit(filepath);
+        }
+
+        // Create tab in target editor and switch to it
+        if (toEditor === 'left') {
+            this.createTab(filepath);
+            this.switchToTab(filepath);
+            this.focusedEditor = 'left';
+        } else {
+            this.createTabInSplit(filepath);
+            this.switchToTabInSplit(filepath);
+            this.focusedEditor = 'right';
+        }
+
+        this.updateEditorFocusVisual();
+    }
+
+    updateSplitButtonIcon() {
+        const splitToggleBtn = document.getElementById('splitToggleBtn');
+        if (splitToggleBtn) {
+            const icon = splitToggleBtn.querySelector('i');
+            if (icon) {
+                if (this.splitViewActive) {
+                    icon.className = 'codicon codicon-screen-normal';
+                    splitToggleBtn.title = 'Close Split Editor';
+                } else {
+                    icon.className = 'codicon codicon-split-horizontal';
+                    splitToggleBtn.title = 'Split Editor';
+                }
+            }
+        }
+    }
+
+    setupEditorFocusTracking() {
+        // Track focus on left editor
+        const leftEditorContainer = document.querySelector('#editorGroup1 .editor-container');
+        if (leftEditorContainer) {
+            leftEditorContainer.addEventListener('click', () => {
+                this.focusedEditor = 'left';
+                this.updateEditorFocusVisual();
+            });
+        }
+
+        // Track focus on right editor
+        const rightEditorContainer = document.querySelector('#editorGroup2 .editor-container');
+        if (rightEditorContainer) {
+            rightEditorContainer.addEventListener('click', () => {
+                this.focusedEditor = 'right';
+                this.updateEditorFocusVisual();
+            });
+        }
+    }
+
+    updateEditorFocusVisual() {
+        const leftGroup = document.getElementById('editorGroup1');
+        const rightGroup = document.getElementById('editorGroup2');
+
+        if (leftGroup && rightGroup) {
+            if (this.focusedEditor === 'left') {
+                leftGroup.style.opacity = '1';
+                rightGroup.style.opacity = '0.7';
+            } else {
+                leftGroup.style.opacity = '0.7';
+                rightGroup.style.opacity = '1';
+            }
+        }
+    }
+
 
     showContextMenu(event, filePath, type) {
         this.closeContextMenu();
