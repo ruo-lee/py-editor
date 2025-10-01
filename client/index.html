@@ -25,13 +25,20 @@
         }
 
         .header {
-            height: 40px;
-            background: #2d2d30;
-            border-bottom: 1px solid #3e3e42;
+            height: 35px;
+            background: #323233;
+            border-bottom: 1px solid #2b2b2b;
             display: flex;
             align-items: center;
             padding: 0 15px;
-            font-weight: 500;
+            font-weight: 400;
+        }
+
+        .app-title {
+            font-size: 12px;
+            color: #cccccc;
+            letter-spacing: 0.5px;
+            font-weight: 400;
         }
 
         .main-content {
@@ -419,8 +426,8 @@
 
         .explorer-header {
             background: #252526;
-            border-bottom: 1px solid #3e3e42;
-            padding: 8px 12px;
+            border-bottom: 1px solid #2b2b2b;
+            padding: 0 8px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -430,10 +437,10 @@
 
         .explorer-title {
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             color: #cccccc;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             user-select: none;
         }
 
@@ -446,24 +453,26 @@
         .action-button {
             background: none;
             border: none;
-            color: #cccccc;
+            color: #c5c5c5;
             cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
-            font-size: 14px;
-            width: 22px;
+            padding: 3px;
+            border-radius: 5px;
+            font-size: 16px;
+            width: 28px;
             height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.1s ease;
-            opacity: 0.8;
         }
 
         .action-button:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(90, 93, 94, 0.31);
             color: #ffffff;
-            opacity: 1;
+        }
+
+        .action-button:active {
+            background: rgba(90, 93, 94, 0.5);
         }
 
         .context-menu {
@@ -614,7 +623,7 @@
 <body>
     <div id="app">
         <div class="header">
-            <span>🐍 Python IDE</span>
+            <span class="app-title">PyEditor</span>
         </div>
         <div class="main-content">
             <div class="sidebar" id="sidebar">
@@ -622,19 +631,13 @@
                     <div class="explorer-title">Explorer</div>
                     <div class="explorer-actions">
                         <button class="action-button" id="newFileBtn" title="New File">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M9.5 1.5L3 1.5v13L13 14.5v-10L9.5 1.5zm0 1L12 5h-2.5V2.5zM4 2.5h4.5v3.5h4v8H4v-11z"/>
-                            </svg>
+                            <i class="codicon codicon-new-file"></i>
                         </button>
                         <button class="action-button" id="newFolderBtn" title="New Folder">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M1.5 2.5v11h13v-8.5h-6L6.293 3.5H1.5zm1 1h3.793l1.207 1.5h6.5v6.5h-11v-8z"/>
-                            </svg>
+                            <i class="codicon codicon-new-folder"></i>
                         </button>
                         <button class="action-button" id="refreshBtn" title="Refresh">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 1.5A6.5 6.5 0 0 0 2.804 4.5h1.696v1H1.5v-3h1v1.304A7.5 7.5 0 0 1 8 0.5a7.5 7.5 0 0 1 6.804 4.304l-.905.437A6.5 6.5 0 0 0 8 1.5zM8 14.5a6.5 6.5 0 0 0 5.196-2.5H11.5v-1H14.5v3h-1v-1.304A7.5 7.5 0 0 1 8 15.5a7.5 7.5 0 0 1-6.804-4.304l.905-.437A6.5 6.5 0 0 0 8 14.5z"/>
-                            </svg>
+                            <i class="codicon codicon-refresh"></i>
                         </button>
                     </div>
                 </div>

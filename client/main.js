@@ -22,6 +22,7 @@ class PythonIDE {
         this.snippets = {};
         this.ctrlPressed = false;
         this.currentLinkDecorations = [];
+        this.rightCurrentLinkDecorations = []; // For right editor
         this.selectedDirectory = ''; // Currently selected directory for context menu operations
         this.contextMenuTarget = null; // Target element for context menu
 
@@ -96,12 +97,18 @@ class PythonIDE {
             },
             guides: {
                 indentation: true
+            },
+            // Disable Monaco's built-in go-to-definition
+            gotoLocation: {
+                multiple: 'goto'
             }
         });
 
         // Add Ctrl+Click for go-to-definition
         this.editor.onMouseDown((e) => {
             if (e.event.ctrlKey || e.event.metaKey) {
+                e.event.preventDefault();
+                e.event.stopPropagation();
                 this.handleCtrlClick(e.target.position);
             }
         });
@@ -529,10 +536,16 @@ class PythonIDE {
         return kindMap[lspKind] || monaco.languages.CompletionItemKind.Text;
     }
 
-    async getDefinition(model, position) {
+    async getDefinition(model, position, editorSide = 'left') {
         try {
-            // Use the active file path for proper LSP resolution
-            const filePath = this.activeFile || 'temp.py';
+            // Use the appropriate active file path based on editor side
+            let filePath;
+            if (editorSide === 'right') {
+                filePath = this.rightActiveFile || this.activeFile || 'temp.py';
+            } else {
+                filePath = this.activeFile || 'temp.py';
+            }
+
             let fileUri;
             if (filePath.startsWith('/usr/local/lib/python3.11/')) {
                 // Standard library file - use absolute path
@@ -726,22 +739,38 @@ class PythonIDE {
         }
     }
 
-    async handleCtrlClick(position) {
+    async handleCtrlClick(position, editorSide = 'left') {
         if (!position) return;
 
-        const definition = await this.getDefinition(this.editor.getModel(), position);
-        if (definition && definition.filePath) {
+        const editor = editorSide === 'right' ? this.rightEditor : this.editor;
+        if (!editor) return;
+
+        try {
+            const definition = await this.getDefinition(editor.getModel(), position, editorSide);
+
+            if (!definition || !definition.filePath || !definition.range) {
+                console.log('No definition found');
+                return;
+            }
+
             console.log('Opening file:', definition.filePath);
             await this.openFile(definition.filePath);
 
+            // Get the editor that now has the file open
+            const targetEditor = this.splitViewActive && this.focusedEditor === 'right'
+                ? this.rightEditor
+                : this.editor;
+
+            if (!targetEditor) return;
+
             // Navigate to the definition position
-            this.editor.setPosition({
+            targetEditor.setPosition({
                 lineNumber: definition.range.startLineNumber,
                 column: definition.range.startColumn
             });
 
             // Highlight the definition briefly
-            this.editor.deltaDecorations([], [{
+            const decorations = targetEditor.deltaDecorations([], [{
                 range: definition.range,
                 options: {
                     className: 'highlight-definition',
@@ -750,23 +779,31 @@ class PythonIDE {
             }]);
 
             setTimeout(() => {
-                this.editor.deltaDecorations([], []);
+                try {
+                    if (targetEditor) {
+                        targetEditor.deltaDecorations(decorations, []);
+                    }
+                } catch (e) {
+                    // Editor may have been disposed
+                }
             }, 2000);
+        } catch (error) {
+            console.error('Ctrl+Click navigation error:', error);
         }
     }
 
-    handleMouseMove(e) {
+    handleMouseMove(e, editorSide = 'left') {
         if (this.ctrlPressed && e.target) {
             // Monaco 에디터의 마우스 이벤트에서 position 추출
             const position = e.target.position;
 
             if (position) {
-                this.showLinkAtPosition(position);
+                this.showLinkAtPosition(position, editorSide);
             } else {
-                this.clearLinkDecorations();
+                this.clearLinkDecorations(editorSide);
             }
         } else {
-            this.clearLinkDecorations();
+            this.clearLinkDecorations(editorSide);
         }
     }
 
@@ -781,15 +818,16 @@ class PythonIDE {
         }
     }
 
-    showLinkAtPosition(position) {
-        const model = this.editor.getModel();
+    showLinkAtPosition(position, editorSide = 'left') {
+        const editor = editorSide === 'right' ? this.rightEditor : this.editor;
+        const model = editor.getModel();
         if (!model) {
             return;
         }
 
         const word = model.getWordAtPosition(position);
         if (!word) {
-            this.clearLinkDecorations();
+            this.clearLinkDecorations(editorSide);
             return;
         }
 
@@ -805,18 +843,31 @@ class PythonIDE {
                 endColumn: word.endColumn
             };
 
-            this.currentLinkDecorations = this.editor.deltaDecorations(
-                this.currentLinkDecorations || [],
-                [{
-                    range: range,
-                    options: {
-                        inlineClassName: 'ctrl-hover-link',
-                        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
-                    }
-                }]
-            );
+            if (editorSide === 'right') {
+                this.rightCurrentLinkDecorations = editor.deltaDecorations(
+                    this.rightCurrentLinkDecorations || [],
+                    [{
+                        range: range,
+                        options: {
+                            inlineClassName: 'ctrl-hover-link',
+                            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+                        }
+                    }]
+                );
+            } else {
+                this.currentLinkDecorations = editor.deltaDecorations(
+                    this.currentLinkDecorations || [],
+                    [{
+                        range: range,
+                        options: {
+                            inlineClassName: 'ctrl-hover-link',
+                            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+                        }
+                    }]
+                );
+            }
         } else {
-            this.clearLinkDecorations();
+            this.clearLinkDecorations(editorSide);
         }
     }
 
@@ -842,12 +893,21 @@ class PythonIDE {
         return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(word);
     }
 
-    clearLinkDecorations() {
-        if (this.currentLinkDecorations) {
-            this.currentLinkDecorations = this.editor.deltaDecorations(
-                this.currentLinkDecorations,
-                []
-            );
+    clearLinkDecorations(editorSide = 'left') {
+        if (editorSide === 'right') {
+            if (this.rightCurrentLinkDecorations && this.rightEditor) {
+                this.rightCurrentLinkDecorations = this.rightEditor.deltaDecorations(
+                    this.rightCurrentLinkDecorations,
+                    []
+                );
+            }
+        } else {
+            if (this.currentLinkDecorations) {
+                this.currentLinkDecorations = this.editor.deltaDecorations(
+                    this.currentLinkDecorations,
+                    []
+                );
+            }
         }
     }
 
@@ -2144,11 +2204,29 @@ class PythonIDE {
                 return;
             }
 
-            // Load file content
-            const response = await fetch(this.buildUrl(`/api/files/${filepath}`));
-            if (!response.ok) throw new Error(`Failed to load file: ${filepath}`);
+            let response, data;
 
-            const data = await response.json();
+            // Check if this is a Python standard library file
+            if (filepath.startsWith('/usr/local/lib/python3.11/')) {
+                // Extract the relative path from the stdlib base path
+                const stdlibPath = filepath.replace('/usr/local/lib/python3.11/', '');
+                response = await fetch(`/api/stdlib/${stdlibPath}`);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load stdlib file: ${filepath}`);
+                }
+
+                data = await response.json();
+            } else {
+                // Regular workspace file
+                response = await fetch(this.buildUrl(`/api/files/${filepath}`));
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load file: ${filepath}`);
+                }
+
+                data = await response.json();
+            }
 
             const model = monaco.editor.createModel(
                 data.content,
@@ -2162,10 +2240,14 @@ class PythonIDE {
                 isStdlib: filepath.startsWith('/usr/local/lib/python3.11/')
             });
 
+            // Notify language server for all Python files
+            this.notifyDocumentOpened(filepath, data.content);
+
             this.createTabInSplit(filepath);
             this.switchToTabInSplit(filepath);
 
         } catch (error) {
+            console.error('Failed to open file in split:', error);
             alert(`Could not open file: ${filepath.split('/').pop()}\nError: ${error.message}`);
         }
     }
@@ -2542,10 +2624,33 @@ class PythonIDE {
             formatOnType: true,
             bracketPairColorization: {
                 enabled: true
+            },
+            // Disable Monaco's built-in go-to-definition
+            gotoLocation: {
+                multiple: 'goto'
             }
         });
 
         this.splitViewActive = true;
+
+        // Setup Ctrl+Click for right editor
+        this.rightEditor.onMouseDown((e) => {
+            if (e.event.ctrlKey || e.event.metaKey) {
+                e.event.preventDefault();
+                e.event.stopPropagation();
+                this.handleCtrlClick(e.target.position, 'right');
+            }
+        });
+
+        // Setup Ctrl+hover for right editor
+        this.rightEditor.onMouseMove((e) => {
+            this.handleMouseMove(e, 'right');
+        });
+
+        // Clear link decorations when mouse leaves right editor
+        this.rightEditor.onMouseLeave(() => {
+            this.clearLinkDecorations('right');
+        });
 
         // Setup divider resize
         this.setupSplitResize(divider, leftGroup, rightGroup);
