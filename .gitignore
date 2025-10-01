@@ -1,0 +1,3 @@
+.claude
+workspace/*
+!workspace/.gitkeep
