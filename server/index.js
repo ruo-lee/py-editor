@@ -12,6 +12,34 @@ const archiver = require('archiver');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Structured logging utility
+const logger = {
+  log(level, message, extra = {}) {
+    const logEntry = {
+      level: level.toUpperCase(),
+      iso_datetime: new Date().toISOString(),
+      module: 'py-editor',
+      ...extra,
+      message
+    };
+    console.log(JSON.stringify(logEntry));
+  },
+  info(message, extra) {
+    this.log('INFO', message, extra);
+  },
+  warn(message, extra) {
+    this.log('WARN', message, extra);
+  },
+  error(message, extra) {
+    this.log('ERROR', message, extra);
+  },
+  debug(message, extra) {
+    if (process.env.DEBUG) {
+      this.log('DEBUG', message, extra);
+    }
+  }
+};
+
 // Multer 설정 (파일 업로드)
 const upload = multer({ dest: '/tmp/uploads/' });
 
@@ -68,6 +96,20 @@ app.delete('/api/files/*', async (req, res) => {
     } else {
       await fs.unlink(filePath);
     }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 디렉토리 생성
+app.post('/api/mkdir', async (req, res) => {
+  try {
+    const { path: dirPath } = req.body;
+    const fullPath = path.join('/app/workspace', dirPath);
+
+    await fs.mkdir(fullPath, { recursive: true });
 
     res.json({ success: true });
   } catch (error) {
@@ -273,7 +315,7 @@ const server = require('http').createServer(app);
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
-  console.log('Language server client connected');
+  logger.info('Language server client connected');
 
   let pylsp = null;
   let messageBuffer = '';
@@ -282,7 +324,7 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      console.log('Received LSP message:', data.method);
+      logger.debug('Received LSP message', { method: data.method, id: data.id });
 
       // Store pending requests for debugging
       if (data.id && data.method) {
@@ -304,21 +346,21 @@ wss.on('connection', (ws) => {
         pylsp.stdout.on('data', (chunk) => {
           try {
             messageBuffer += chunk.toString();
-            console.log('Received chunk from pylsp, buffer length:', messageBuffer.length);
+            logger.debug('Received chunk from pylsp', { bufferLength: messageBuffer.length });
 
             // Process complete LSP messages
             while (true) {
               // Look for Content-Length header anywhere in the header section
               const contentLengthMatch = messageBuffer.match(/Content-Length:\s*(\d+)/);
               if (!contentLengthMatch) {
-                console.log('No Content-Length header found yet, buffer start:', JSON.stringify(messageBuffer.substring(0, 200)));
+                logger.debug('No Content-Length header found yet');
                 break;
               }
 
               // Find the end of all headers (double newline)
               const headerEndMatch = messageBuffer.match(/\r?\n\r?\n/);
               if (!headerEndMatch) {
-                console.log('No complete header section found yet');
+                logger.debug('No complete header section found yet');
                 break;
               }
 
@@ -327,13 +369,13 @@ wss.on('connection', (ws) => {
 
               const totalNeeded = headerEndIndex + contentLength;
               if (messageBuffer.length < totalNeeded) {
-                console.log(`Waiting for more data: have ${messageBuffer.length}, need ${totalNeeded}`);
+                logger.debug('Waiting for more data', { have: messageBuffer.length, need: totalNeeded });
                 break;
               }
 
               const content = messageBuffer.slice(headerEndIndex, headerEndIndex + contentLength);
               messageBuffer = messageBuffer.slice(headerEndIndex + contentLength);
-              console.log('Processing complete LSP message, content length:', contentLength, 'remaining buffer:', messageBuffer.length);
+              logger.debug('Processing complete LSP message', { contentLength, remainingBuffer: messageBuffer.length });
 
               try {
                 const response = JSON.parse(content);
@@ -344,53 +386,60 @@ wss.on('connection', (ws) => {
                   pendingRequests.delete(response.id);
                 }
 
-                console.log('Sending LSP response:', {
+                logger.debug('Sending LSP response', {
                   id: response.id,
                   method: response.method,
                   originalMethod: originalMethod,
                   hasResult: !!response.result,
-                  hasError: !!response.error,
-                  resultType: response.result ? typeof response.result : 'none'
+                  hasError: !!response.error
                 });
-
-                if (originalMethod === 'textDocument/definition') {
-                  console.log('Definition response details:', JSON.stringify(response, null, 2));
-                }
 
                 ws.send(JSON.stringify(response));
               } catch (parseError) {
-                console.error('Failed to parse LSP response:', parseError);
+                logger.error('Failed to parse LSP response', { error: parseError.message });
               }
             }
           } catch (error) {
-            console.error('Error processing pylsp output:', error);
+            logger.error('Error processing pylsp output', { error: error.message });
           }
         });
 
         pylsp.stderr.on('data', (data) => {
-          console.error('pylsp stderr:', data.toString());
+          const output = data.toString().trim();
+          if (output) {
+            // Parse common pylsp stderr messages
+            if (output.includes('reformatted')) {
+              logger.debug(output, { source: 'pylsp.formatter' });
+            } else if (output.includes('mypy')) {
+              logger.debug(output, { source: 'pylsp.mypy' });
+            } else if (output.includes('ERROR') || output.includes('Error')) {
+              logger.error(output, { source: 'pylsp' });
+            } else {
+              logger.debug(output, { source: 'pylsp' });
+            }
+          }
         });
 
         pylsp.on('exit', (code) => {
-          console.log('pylsp exited with code:', code);
+          logger.info('pylsp exited', { exitCode: code });
         });
       }
 
       if (pylsp && pylsp.stdin.writable) {
         const content = JSON.stringify(data);
         const header = `Content-Length: ${Buffer.byteLength(content)}\r\n\r\n`;
-        console.log('Sending to pylsp:', { method: data.method, id: data.id });
+        logger.debug('Sending to pylsp', { method: data.method, id: data.id });
         pylsp.stdin.write(header + content);
       } else {
-        console.error('pylsp not ready or stdin not writable');
+        logger.error('pylsp not ready or stdin not writable');
       }
     } catch (error) {
-      console.error('WebSocket message error:', error);
+      logger.error('WebSocket message error', { error: error.message });
     }
   });
 
   ws.on('close', () => {
-    console.log('Language server client disconnected');
+    logger.info('Language server client disconnected');
     if (pylsp) {
       pylsp.kill();
     }
@@ -403,5 +452,5 @@ app.get('*', (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Python IDE server running on port ${PORT}`);
+  logger.info('Python IDE server running', { port: PORT });
 });

@@ -176,7 +176,7 @@ class PythonIDE {
             this.pendingRequests = new Map();
 
             this.languageClient.onopen = () => {
-                console.log('Language server connected');
+                // Language server connected
                 this.initializeLSP();
             };
 
@@ -195,7 +195,7 @@ class PythonIDE {
             };
 
             this.languageClient.onclose = () => {
-                console.log('Language server disconnected');
+                // Language server disconnected
                 this.setupBasicValidation();
             };
         } catch (error) {
@@ -261,18 +261,9 @@ class PythonIDE {
     }
 
     handleLSPResponse(response) {
-        console.log('Received LSP response:', {
-            id: response.id,
-            method: response.method,
-            hasResult: !!response.result,
-            hasError: !!response.error
-        });
-
         if (response.id && this.pendingRequests.has(response.id)) {
             const request = this.pendingRequests.get(response.id);
             this.pendingRequests.delete(response.id);
-
-            console.log('Processing response for method:', request.method);
 
             switch (request.method) {
                 case 'initialize':
@@ -282,22 +273,17 @@ class PythonIDE {
                     this.handleCompletionResponse(response);
                     break;
                 case 'textDocument/definition':
-                    console.log('Definition response:', response);
                     this.handleDefinitionResponse(response);
                     break;
                 case 'textDocument/hover':
                     this.handleHoverResponse(response);
                     break;
             }
-        } else {
-            console.log('No pending request for response ID:', response.id);
         }
     }
 
     handleInitializeResponse(response) {
         if (response.result) {
-            console.log('Language server initialized');
-
             // Send initialized notification
             this.sendLSPRequest({
                 jsonrpc: '2.0',
@@ -363,7 +349,16 @@ class PythonIDE {
 
             // Get the proper file path from the active file
             const filePath = this.activeFile || 'temp.py';
-            const fileUri = `file:///app/workspace/${filePath}`;
+
+            // Determine correct URI based on file path
+            let fileUri;
+            if (filePath.startsWith('/usr/local/lib/python3.11/')) {
+                // Standard library file - use absolute path
+                fileUri = `file://${filePath}`;
+            } else {
+                // Workspace file - use workspace prefix
+                fileUri = `file:///app/workspace/${filePath}`;
+            }
 
             // Notify language server of document changes
             this.sendLSPRequest({
@@ -506,15 +501,6 @@ class PythonIDE {
                 fileUri = `file:///app/workspace/${filePath}`;
             }
 
-            console.log('Requesting definition at:', {
-                file: filePath,
-                uri: fileUri,
-                position: {
-                    line: position.lineNumber - 1,
-                    character: position.column - 1
-                }
-            });
-
             // Ensure document is synchronized before requesting definition
             await this.ensureDocumentSynchronized(filePath, model.getValue());
 
@@ -534,15 +520,12 @@ class PythonIDE {
                 }
             };
 
-            console.log('Sending definition request:', definitionRequest);
-
             return new Promise((resolve) => {
                 this.definitionResolve = resolve;
                 this.sendLSPRequest(definitionRequest);
 
                 setTimeout(() => {
                     if (this.definitionResolve === resolve) {
-                        console.log('Definition request timed out');
                         this.definitionResolve = null;
                         resolve(null);
                     }
@@ -584,21 +567,16 @@ class PythonIDE {
     }
 
     handleDefinitionResponse(response) {
-        console.log('handleDefinitionResponse called with:', response);
-
         if (this.definitionResolve) {
             const resolve = this.definitionResolve;
             this.definitionResolve = null;
 
             if (response.result) {
-                console.log('Definition result:', response.result);
-
                 // Handle both array and single object results
                 const locations = Array.isArray(response.result) ? response.result : [response.result];
 
                 if (locations.length > 0) {
                     const location = locations[0];
-                    console.log('First location:', location);
 
                     if (location.uri && location.range) {
                         // Handle both workspace and stdlib file URIs
@@ -614,8 +592,6 @@ class PythonIDE {
                             filePath = location.uri;
                         }
 
-                        console.log('Resolved file path:', filePath);
-
                         resolve({
                             filePath: filePath,
                             range: {
@@ -630,10 +606,7 @@ class PythonIDE {
                 }
             }
 
-            console.log('No valid definition found, resolving null');
             resolve(null);
-        } else {
-            console.log('No definition resolve callback found');
         }
     }
 
@@ -641,7 +614,16 @@ class PythonIDE {
         try {
             // Use the active file path for proper LSP resolution
             const filePath = this.activeFile || 'temp.py';
-            const fileUri = `file:///app/workspace/${filePath}`;
+
+            // Determine correct URI based on file path
+            let fileUri;
+            if (filePath.startsWith('/usr/local/lib/python3.11/')) {
+                // Standard library file - use absolute path
+                fileUri = `file://${filePath}`;
+            } else {
+                // Workspace file - use workspace prefix
+                fileUri = `file:///app/workspace/${filePath}`;
+            }
 
             const hoverRequest = {
                 jsonrpc: '2.0',
@@ -857,12 +839,22 @@ class PythonIDE {
 
     notifyDocumentChanged(filepath, content) {
         if (this.languageClient && this.languageClient.readyState === WebSocket.OPEN) {
+            // Determine correct URI based on file path
+            let fileUri;
+            if (filepath.startsWith('/usr/local/lib/python3.11/')) {
+                // Standard library file - use absolute path
+                fileUri = `file://${filepath}`;
+            } else {
+                // Workspace file - use workspace prefix
+                fileUri = `file:///app/workspace/${filepath}`;
+            }
+
             this.sendLSPRequest({
                 jsonrpc: '2.0',
                 method: 'textDocument/didChange',
                 params: {
                     textDocument: {
-                        uri: `file:///app/workspace/${filepath}`,
+                        uri: fileUri,
                         version: Date.now()
                     },
                     contentChanges: [{
@@ -887,6 +879,17 @@ class PythonIDE {
             const response = await fetch('/api/files');
             const files = await response.json();
             this.renderFileExplorer(files);
+
+            // Restore selected directory highlight after refresh
+            if (this.selectedDirectory) {
+                const selectedElement = document.querySelector(`[data-path="${this.selectedDirectory}"][data-type="directory"]`);
+                if (selectedElement) {
+                    selectedElement.classList.add('selected');
+                } else {
+                    // Directory no longer exists, clear selection
+                    this.selectedDirectory = '';
+                }
+            }
         } catch (error) {
             this.fileExplorer.innerHTML = '<div class="error">Failed to load files</div>';
         }
@@ -912,7 +915,11 @@ class PythonIDE {
                             <path d="M6 4l4 4-4 4V4z"/>
                         </svg>
                     </span>
-                    <span class="file-icon">📁</span>
+                    <span class="file-icon">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="#dcb67a" style="display: block;">
+                            <path d="M1.5 3v10h13V5.5H7L5.5 3h-4zm1 1h2.8l1.5 2.5h7.2v6.5h-11V4z"/>
+                        </svg>
+                    </span>
                     <span>${item.name}</span>
                 `;
 
@@ -1116,6 +1123,13 @@ class PythonIDE {
                 throw new Error('Failed to move item');
             }
 
+            // Update selected directory if it was moved
+            if (this.selectedDirectory === draggedItem.path) {
+                this.selectedDirectory = newPath;
+            } else if (this.selectedDirectory.startsWith(draggedItem.path + '/')) {
+                this.selectedDirectory = this.selectedDirectory.replace(draggedItem.path, newPath);
+            }
+
             // 열린 탭 업데이트
             if (this.openTabs.has(draggedItem.path)) {
                 const tabData = this.openTabs.get(draggedItem.path);
@@ -1178,38 +1192,92 @@ class PythonIDE {
 
     getFileIcon(filename) {
         const ext = filename.split('.').pop()?.toLowerCase();
+        const color = this.getFileIconColor(ext);
+
+        // SVG icon template
+        const svgIcon = (path, color = '#c5c5c5') => {
+            return `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}" style="display: block;">
+                ${path}
+            </svg>`;
+        };
+
         switch (ext) {
-            case 'py': return '🐍';
-            case 'json': return '📋';
-            case 'html': case 'htm': return '🌐';
-            case 'css': case 'scss': case 'sass': return '🎨';
-            case 'js': case 'jsx': case 'ts': case 'tsx': return '📜';
-            case 'md': case 'markdown': return '📝';
-            case 'txt': return '📃';
-            case 'yml': case 'yaml': return '⚙️';
-            case 'xml': return '📰';
-            case 'csv': return '📊';
-            case 'log': return '📜';
-            case 'sql': return '🗃️';
-            case 'sh': case 'bash': return '⚡';
-            case 'php': return '🐘';
-            case 'java': return '☕';
-            case 'c': case 'cpp': case 'h': return '⚙️';
-            case 'go': return '🐹';
-            case 'rs': return '🦀';
-            case 'swift': return '🦉';
-            case 'kt': case 'kts': return '🎯';
-            case 'rb': return '💎';
-            case 'env': return '🔐';
-            case 'config': case 'conf': return '⚙️';
-            case 'dockerfile': return '🐳';
-            case 'gitignore': return '🚫';
-            case 'lock': return '🔒';
-            case 'zip': case 'tar': case 'gz': return '📦';
-            case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg': return '🖼️';
-            case 'pdf': return '📕';
-            default: return '📄';
+            case 'py':
+                return svgIcon('<path d="M7.5 1.5c-1.5 0-2.7.3-3.5.8-.8.5-1.2 1.2-1.2 2v2.2c0 .8.4 1.5 1.2 2 .8.5 2 .8 3.5.8s2.7-.3 3.5-.8c.8-.5 1.2-1.2 1.2-2V4.3c0-.8-.4-1.5-1.2-2-.8-.5-2-.8-3.5-.8zm0 1c1.3 0 2.4.2 3 .6.6.4.8.8.8 1.2 0 .4-.2.8-.8 1.2-.6.4-1.7.6-3 .6s-2.4-.2-3-.6c-.6-.4-.8-.8-.8-1.2 0-.4.2-.8.8-1.2.6-.4 1.7-.6 3-.6zm-3.8 5.2c.8.5 2 .8 3.8.8s3-.3 3.8-.8v1.8c0 .4-.2.8-.8 1.2-.6.4-1.7.6-3 .6s-2.4-.2-3-.6c-.6-.4-.8-.8-.8-1.2V7.7zm0 3.5c.8.5 2 .8 3.8.8s3-.3 3.8-.8v1.8c0 .4-.2.8-.8 1.2-.6.4-1.7.6-3 .6s-2.4-.2-3-.6c-.6-.4-.8-.8-.8-1.2v-1.8z"/>', '#6b9bd2');
+            case 'js': case 'jsx':
+                return svgIcon('<path d="M2.5 2.5h11v11h-11v-11zm1 1v9h9v-9h-9zm2 2h1v5h-1v-5zm3 0h1v3.5c0 .3-.1.5-.3.7-.2.2-.4.3-.7.3h-.5v-1h.5v-3.5z"/>', '#f0db4f');
+            case 'ts': case 'tsx':
+                return svgIcon('<path d="M2.5 2.5h11v11h-11v-11zm1 1v9h9v-9h-9zm2 2h4v1h-1.5v4h-1v-4h-1.5v-1zm5 0h1v5h-1v-5z"/>', '#519aba');
+            case 'json':
+                return svgIcon('<path d="M5 3.5h-.5c-.3 0-.5.2-.5.5v1.5c0 .3-.2.5-.5.5h-.5v1h.5c.3 0 .5.2.5.5v1.5c0 .3.2.5.5.5h.5v-1h-.5v-1.5c0-.5-.2-.9-.5-1.2.3-.3.5-.7.5-1.2v-1.5h.5v-1zm6 0h.5c.3 0 .5.2.5.5v1.5c0 .3.2.5.5.5h.5v1h-.5c-.3 0-.5.2-.5.5v1.5c0 .3-.2.5-.5.5h-.5v-1h.5v-1.5c0-.5.2-.9.5-1.2-.3-.3-.5-.7-.5-1.2v-1.5h-.5v-1z"/>', '#c5c5c5');
+            case 'html': case 'htm':
+                return svgIcon('<path d="M2 2.5v11h12v-11h-12zm1 1h10v9h-10v-9zm2 2v1h1v2h1v-2h1v-1h-3zm4 0v3h3v-1h-2v-.5h2v-1h-2v-.5h2v-1h-3z"/>', '#e65c5c');
+            case 'css': case 'scss': case 'sass':
+                return svgIcon('<path d="M2.5 2.5v11h11v-11h-11zm1 1h9v9h-9v-9zm2 2v1h4v1h-3v3h4v-1h-3v-1h3v-3h-5z"/>', '#5d8fdb');
+            case 'md': case 'markdown':
+                return svgIcon('<path d="M2 4.5v7h12v-7h-12zm1 1h10v5h-10v-5zm1.5 1v3l1-1.5 1 1.5v-3h1v3h1l1.5-1.5v1.5h1v-3h-7.5z"/>', '#c5c5c5');
+            case 'txt':
+                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4 3h5v1h-5v-1zm0 2h5v1h-5v-1z"/>', '#c5c5c5');
+            case 'yml': case 'yaml': case 'config': case 'conf':
+                return svgIcon('<path d="M2 2.5v11h12v-11h-12zm1 1h10v9h-10v-9zm2 1v1h1v-1h-1zm2 0v1h4v-1h-4zm-2 2v1h1v-1h-1zm2 0v1h4v-1h-4zm-2 2v1h1v-1h-1zm2 0v1h4v-1h-4z"/>', '#e65c5c');
+            case 'xml':
+                return svgIcon('<path d="M3 3v10h10v-10h-10zm1 1h8v8h-8v-8zm1 2l1.5 2-1.5 2h1l1-1.3 1 1.3h1l-1.5-2 1.5-2h-1l-1 1.3-1-1.3h-1z"/>', '#c5c5c5');
+            case 'csv':
+                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4 3v4h5v-4h-5zm1 1h1v2h-1v-2zm2 0h1v2h-1v-2z"/>', '#4db380');
+            case 'log':
+                return svgIcon('<path d="M3.5 2.5v11h9v-11h-9zm1 1h7v9h-7v-9zm1 2v1h5v-1h-5zm0 2v1h4v-1h-4zm0 2v1h5v-1h-5z"/>', '#c5c5c5');
+            case 'sql':
+                return svgIcon('<path d="M8 3c-2.2 0-4 .7-4 1.5v7c0 .8 1.8 1.5 4 1.5s4-.7 4-1.5v-7c0-.8-1.8-1.5-4-1.5zm0 1c1.7 0 3 .4 3 .5s-1.3.5-3 .5-3-.4-3-.5 1.3-.5 3-.5zm-3 2.2c.8.5 1.8.8 3 .8s2.2-.3 3-.8v1.3c0 .1-1.3.5-3 .5s-3-.4-3-.5v-1.3zm0 2.5c.8.5 1.8.8 3 .8s2.2-.3 3-.8v1.3c0 .1-1.3.5-3 .5s-3-.4-3-.5v-1.3z"/>', '#c5c5c5');
+            case 'sh': case 'bash':
+                return svgIcon('<path d="M2 4v8h12v-8h-12zm1 1h10v6h-10v-6zm1.5 1.5v1h1v-1h-1zm2 0v1h4v-1h-4zm-2 2v1h3v-1h-3zm4 0v1h2v-1h-2z"/>', '#6bc267');
+            case 'php':
+                return svgIcon('<path d="M2 5v6h12v-6h-12zm1 1h10v4h-10v-4zm1 1v2h1.5c.3 0 .5-.2.5-.5v-1c0-.3-.2-.5-.5-.5h-1.5zm3 0v2h1v-1.5h.5v1.5h1v-2h-2.5zm3 0v2h1.5c.3 0 .5-.2.5-.5v-1c0-.3-.2-.5-.5-.5h-1.5zm-5 .5h.5v1h-.5v-1zm5 0h.5v1h-.5v-1z"/>', '#9b7cc4');
+            case 'java':
+                return svgIcon('<path d="M6 3c-.5 1-.5 2-.5 2s1 1 2.5 1 2.5-1 2.5-1-.1-1-.5-2c-.3.5-1 1-2 1s-1.7-.5-2-1zm-1 4c0 1 .5 2 1.5 2.5-.5.5-.5 1-.5 1s1 .5 2 .5 2-.5 2-.5-.1-.5-.5-1c1-.5 1.5-1.5 1.5-2.5 0 0-1 1-3 1s-3-1-3-1zm1 4.5s0 1 2 1.5c2-.5 2-1.5 2-1.5s-1 .5-2 .5-2-.5-2-.5z"/>', '#5d9bd6');
+            case 'c': case 'cpp': case 'h':
+                return svgIcon('<path d="M8 3c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 1c2.2 0 4 1.8 4 4s-1.8 4-4 4-4-1.8-4-4 1.8-4 4-4zm-1.5 2v1.5h-1v1h1v1.5h1v-1.5h1v-1h-1v-1.5h-1z"/>', '#5d9bd6');
+            case 'go':
+                return svgIcon('<path d="M3 6c-.5 0-1 .5-1 1v2c0 .5.5 1 1 1h2c.5 0 1-.5 1-1v-2c0-.5-.5-1-1-1h-2zm5 0v1h5v-1h-5zm-5 1h2v2h-2v-2zm5 1v1h3v-1h-3z"/>', '#5dc9e2');
+            case 'rs':
+                return svgIcon('<path d="M8 3l-5 2.5v5l5 2.5 5-2.5v-5l-5-2.5zm0 1.5l3.5 1.8v3.4l-3.5 1.8-3.5-1.8v-3.4l3.5-1.8z"/>', '#e6b8a2');
+            case 'swift':
+                return svgIcon('<path d="M3 4c-.5 0-1 .5-1 1v6c0 .5.5 1 1 1h10c.5 0 1-.5 1-1v-6c0-.5-.5-1-1-1h-10zm0 1h10v6h-10v-6zm2 1.5c-.3.3-.5.7-.5 1.5 0 1.1.9 2 2 2 .4 0 .8-.1 1-.3.3.2.7.3 1 .3 1.1 0 2-.9 2-2s-.9-2-2-2c-.3 0-.7.1-1 .3-.2-.2-.6-.3-1-.3-.8 0-1.2.2-1.5.5z"/>', '#f27b5b');
+            case 'kt': case 'kts':
+                return svgIcon('<path d="M3 3v10h10v-10h-10zm1 1h8l-4 4-4 4v-8zm0 8l4-4 4 4h-8z"/>', '#a87dff');
+            case 'rb':
+                return svgIcon('<path d="M8 2l-6 3v6l6 3 6-3v-6l-6-3zm0 1.5l4.5 2.2v4.6l-4.5 2.2-4.5-2.2v-4.6l4.5-2.2z"/>', '#e65c5c');
+            case 'env':
+                return svgIcon('<path d="M8 3c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 1c2.2 0 4 1.8 4 4s-1.8 4-4 4-4-1.8-4-4 1.8-4 4-4zm-1 2v1h-1v2h1v1h2v-1h1v-2h-1v-1h-2zm1 1v2h-1v-2h1z"/>', '#ffd966');
+            case 'dockerfile':
+                return svgIcon('<path d="M2 6v6h12v-6h-12zm1 1h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1zm-9 2h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1zm3 0h2v1h-2v-1z"/>', '#4db3e8');
+            case 'gitignore':
+                return svgIcon('<path d="M3 3v10h10v-10h-10zm1 1h8v8h-8v-8zm2 2v1h4v-1h-4zm0 2v1h3v-1h-3z"/>', '#c5c5c5');
+            case 'lock':
+                return svgIcon('<path d="M8 2c-1.1 0-2 .9-2 2v2h-1v6h6v-6h-1v-2c0-1.1-.9-2-2-2zm0 1c.6 0 1 .4 1 1v2h-2v-2c0-.6.4-1 1-1zm-2 4h4v4h-4v-4zm2 1v2h1v-2h-1z"/>', '#c5c5c5');
+            case 'zip': case 'tar': case 'gz':
+                return svgIcon('<path d="M6 2v1h1v1h-1v1h1v1h-1v1h1v1h-1v1h1v1h-1v2c0 .5.5 1 1 1h4c.5 0 1-.5 1-1v-8l-3-3h-3zm1 1h2v1h-2v-1zm3 0v2h2l-2-2zm-3 2h2v1h-2v-1zm0 2h2v1h-2v-1zm-1 2h6v2h-6v-2z"/>', '#c5c5c5');
+            case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg':
+                return svgIcon('<path d="M2 3v10h12v-10h-12zm1 1h10v8h-10v-8zm1 1v6l2-2 1 1 2-2 2 2v-5h-7zm1.5 1c.3 0 .5.2.5.5s-.2.5-.5.5-.5-.2-.5-.5.2-.5.5-.5z"/>', '#c58ae0');
+            case 'pdf':
+                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4 3.5c.3 0 .5.2.5.5s-.2.5-.5.5h-.5v1h-.5v-2.5h1zm2 0v2.5h-.5v-1h-.5v1h-.5v-2.5h1.5zm2 0c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5h-1v-2.5h1zm-3.5.5v.5h.5v-.5h-.5zm2 0v1.5h.5v-1.5h-.5z"/>', '#f46060');
+            default:
+                return svgIcon('<path d="M3.5 2.5l7 0 3 3v8h-10v-11zm1 1v9h8v-6.5h-2.5v-2.5h-5.5zm5.5 0v2h2l-2-2zm-4.5 3h5v1h-5v-1zm0 2h5v1h-5v-1z"/>', '#c5c5c5');
         }
+    }
+
+    getFileIconColor(ext) {
+        // Return color for each file type (for reference, actual color is in SVG)
+        const colors = {
+            'py': '#3776ab',
+            'js': '#f0db4f',
+            'jsx': '#f0db4f',
+            'ts': '#3178c6',
+            'tsx': '#3178c6',
+            'html': '#e34c26',
+            'css': '#264de4',
+            'json': '#858585',
+        };
+        return colors[ext] || '#858585';
     }
 
     async openFile(filepath) {
@@ -1451,10 +1519,14 @@ class PythonIDE {
 
         // Explorer actions
         document.getElementById('newFileBtn').addEventListener('click', () => {
+            // Clear selection when using toolbar button (create in root)
+            this.selectedDirectory = '';
             this.showCreateDialog('file');
         });
 
         document.getElementById('newFolderBtn').addEventListener('click', () => {
+            // Clear selection when using toolbar button (create in root)
+            this.selectedDirectory = '';
             this.showCreateDialog('folder');
         });
 
@@ -1493,6 +1565,17 @@ class PythonIDE {
             if (e.target === this.fileExplorer || e.target.closest('.file-item') === null) {
                 e.preventDefault();
                 this.showEmptySpaceContextMenu(e);
+            }
+        });
+
+        // Click on empty space to deselect
+        this.fileExplorer.addEventListener('click', (e) => {
+            if (e.target === this.fileExplorer || (e.target.classList.contains('folder-content') && e.target.children.length === 0)) {
+                // Clear previous selections
+                document.querySelectorAll('.file-item.selected').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                this.selectedDirectory = '';
             }
         });
     }
@@ -1575,13 +1658,13 @@ class PythonIDE {
     }
 
     async createFolder(foldername) {
-        // Create a temporary file in the folder to ensure it exists
-        const response = await fetch(`/api/files/${foldername}/.gitkeep`, {
+        // Create folder using mkdir API
+        const response = await fetch('/api/mkdir', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ content: '' })
+            body: JSON.stringify({ path: foldername })
         });
 
         if (!response.ok) {
@@ -1601,6 +1684,9 @@ class PythonIDE {
     closeDialog() {
         const dialogs = document.querySelectorAll('.input-dialog');
         dialogs.forEach(dialog => dialog.remove());
+
+        // Keep selected directory when dialog is closed (don't clear)
+        // This allows users to create multiple files in the same directory
     }
 
     closeContextMenu() {
@@ -1753,8 +1839,8 @@ class PythonIDE {
         menu.style.top = event.pageY + 'px';
 
         const menuItems = [
-            { text: 'New File', action: () => this.showCreateDialog('file') },
-            { text: 'New Folder', action: () => this.showCreateDialog('folder') },
+            { text: 'New File', action: () => { this.selectedDirectory = ''; this.showCreateDialog('file'); } },
+            { text: 'New Folder', action: () => { this.selectedDirectory = ''; this.showCreateDialog('folder'); } },
             { separator: true },
             { text: 'Refresh', action: () => this.loadFileExplorer() }
         ];
@@ -1888,6 +1974,11 @@ class PythonIDE {
                 this.closeTab(filePath);
             }
 
+            // Clear selected directory if it was deleted or is a child of deleted directory
+            if (this.selectedDirectory === filePath || this.selectedDirectory.startsWith(filePath + '/')) {
+                this.selectedDirectory = '';
+            }
+
             this.loadFileExplorer();
         } catch (error) {
             alert('Failed to delete: ' + error.message);
@@ -1910,6 +2001,13 @@ class PythonIDE {
 
         // Delete old file
         await fetch(`/api/files/${oldPath}`, { method: 'DELETE' });
+
+        // Update selected directory if it was moved
+        if (this.selectedDirectory === oldPath) {
+            this.selectedDirectory = newPath;
+        } else if (this.selectedDirectory.startsWith(oldPath + '/')) {
+            this.selectedDirectory = this.selectedDirectory.replace(oldPath, newPath);
+        }
 
         // Update open tabs
         if (this.openTabs.has(oldPath)) {
