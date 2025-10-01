@@ -35,6 +35,8 @@ class PythonIDE {
         this.rightOpenTabs = new Map();
         this.rightActiveFile = null;
         this.focusedEditor = 'left'; // 'left' or 'right' - tracks which editor has focus
+        this.syncInProgress = false; // Prevents infinite sync loops
+        this.modelChangeListeners = new Map(); // Stores change listeners for cleanup
 
         this.initializeEditor();
         this.initializeLanguageServer();
@@ -1623,10 +1625,18 @@ class PythonIDE {
             // Show execute button for Python files (not for stdlib files)
             const isPython = filepath.endsWith('.py');
             this.executeButton.style.display = (isPython && !tabData.isStdlib) ? 'block' : 'none';
+
+            // Setup sync if same file is open in both editors
+            if (this.splitViewActive) {
+                this.setupModelSync(filepath);
+            }
         }
     }
 
     closeTab(filepath) {
+        // Cleanup sync listener if exists
+        this.cleanupSyncListener(filepath);
+
         const tabData = this.openTabs.get(filepath);
         if (tabData) {
             tabData.model.dispose();
@@ -2258,10 +2268,16 @@ class PythonIDE {
                 const isPython = filepath.endsWith('.py');
                 executeButton2.style.display = (isPython && !tabData.isStdlib) ? 'block' : 'none';
             }
+
+            // Setup sync if same file is open in both editors
+            this.setupModelSync(filepath);
         }
     }
 
     closeTabInSplit(filepath) {
+        // Cleanup sync listener if exists
+        this.cleanupSyncListener(filepath);
+
         const tabData = this.rightOpenTabs.get(filepath);
         if (tabData) {
             tabData.model.dispose();
@@ -2365,8 +2381,104 @@ class PythonIDE {
         this.splitViewActive = false;
         this.focusedEditor = 'left';
 
+        // Cleanup sync listeners
+        this.cleanupAllSyncListeners();
+
         // Update split button icon
         this.updateSplitButtonIcon();
+    }
+
+    setupModelSync(filepath) {
+        // Check if same file is open in both editors
+        const leftTab = this.openTabs.get(filepath);
+        const rightTab = this.rightOpenTabs.get(filepath);
+
+        if (!leftTab || !rightTab || !this.splitViewActive) {
+            return;
+        }
+
+        // Cleanup existing listeners for this file
+        this.cleanupSyncListener(filepath);
+
+        const leftModel = leftTab.model;
+        const rightModel = rightTab.model;
+
+        // Create listener for left editor changes
+        const leftListener = leftModel.onDidChangeContent((e) => {
+            if (this.syncInProgress) return;
+
+            this.syncInProgress = true;
+
+            // Apply changes to right model
+            e.changes.forEach(change => {
+                const range = new monaco.Range(
+                    change.range.startLineNumber,
+                    change.range.startColumn,
+                    change.range.endLineNumber,
+                    change.range.endColumn
+                );
+                rightModel.pushEditOperations(
+                    [],
+                    [{
+                        range: range,
+                        text: change.text
+                    }],
+                    () => null
+                );
+            });
+
+            this.syncInProgress = false;
+        });
+
+        // Create listener for right editor changes
+        const rightListener = rightModel.onDidChangeContent((e) => {
+            if (this.syncInProgress) return;
+
+            this.syncInProgress = true;
+
+            // Apply changes to left model
+            e.changes.forEach(change => {
+                const range = new monaco.Range(
+                    change.range.startLineNumber,
+                    change.range.startColumn,
+                    change.range.endLineNumber,
+                    change.range.endColumn
+                );
+                leftModel.pushEditOperations(
+                    [],
+                    [{
+                        range: range,
+                        text: change.text
+                    }],
+                    () => null
+                );
+            });
+
+            this.syncInProgress = false;
+        });
+
+        // Store listeners for cleanup
+        this.modelChangeListeners.set(filepath, {
+            leftListener,
+            rightListener
+        });
+    }
+
+    cleanupSyncListener(filepath) {
+        const listeners = this.modelChangeListeners.get(filepath);
+        if (listeners) {
+            listeners.leftListener.dispose();
+            listeners.rightListener.dispose();
+            this.modelChangeListeners.delete(filepath);
+        }
+    }
+
+    cleanupAllSyncListeners() {
+        this.modelChangeListeners.forEach((listeners) => {
+            listeners.leftListener.dispose();
+            listeners.rightListener.dispose();
+        });
+        this.modelChangeListeners.clear();
     }
 
     toggleSplit() {
