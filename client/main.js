@@ -5,7 +5,7 @@ import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 self.MonacoEnvironment = {
     getWorker() {
         return new editorWorker();
-    }
+    },
 };
 
 class PythonIDE {
@@ -93,15 +93,15 @@ class PythonIDE {
             formatOnPaste: true,
             formatOnType: true,
             bracketPairColorization: {
-                enabled: true
+                enabled: true,
             },
             guides: {
-                indentation: true
+                indentation: true,
             },
             // Disable Monaco's built-in go-to-definition
             gotoLocation: {
-                multiple: 'goto'
-            }
+                multiple: 'goto',
+            },
         });
 
         // Add Ctrl+Click for go-to-definition
@@ -193,30 +193,46 @@ class PythonIDE {
                         label: snippet.prefix,
                         kind: monaco.languages.CompletionItemKind.Snippet,
                         insertText: snippet.body.join('\n'),
-                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                        insertTextRules:
+                            monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                         documentation: snippet.description,
-                        detail: 'Python Snippet'
+                        detail: 'Python Snippet',
                     });
                 });
 
                 // Add basic Python keywords
                 const keywords = [
-                    'def', 'class', 'if', 'elif', 'else', 'for', 'while',
-                    'try', 'except', 'finally', 'with', 'import', 'from',
-                    'return', 'yield', 'pass', 'break', 'continue'
+                    'def',
+                    'class',
+                    'if',
+                    'elif',
+                    'else',
+                    'for',
+                    'while',
+                    'try',
+                    'except',
+                    'finally',
+                    'with',
+                    'import',
+                    'from',
+                    'return',
+                    'yield',
+                    'pass',
+                    'break',
+                    'continue',
                 ];
 
-                keywords.forEach(keyword => {
+                keywords.forEach((keyword) => {
                     suggestions.push({
                         label: keyword,
                         kind: monaco.languages.CompletionItemKind.Keyword,
                         insertText: keyword,
-                        detail: 'Python Keyword'
+                        detail: 'Python Keyword',
                     });
                 });
 
                 return { suggestions };
-            }
+            },
         });
     }
 
@@ -267,7 +283,7 @@ class PythonIDE {
                 processId: null,
                 clientInfo: {
                     name: 'Python IDE',
-                    version: '1.0.0'
+                    version: '1.0.0',
                 },
                 rootUri: 'file:///app/workspace',
                 capabilities: {
@@ -276,29 +292,31 @@ class PythonIDE {
                             dynamicRegistration: false,
                             completionItem: {
                                 snippetSupport: true,
-                                documentationFormat: ['markdown', 'plaintext']
-                            }
+                                documentationFormat: ['markdown', 'plaintext'],
+                            },
                         },
                         definition: {
                             dynamicRegistration: false,
-                            linkSupport: true
+                            linkSupport: true,
                         },
                         hover: {
                             dynamicRegistration: false,
-                            contentFormat: ['markdown', 'plaintext']
+                            contentFormat: ['markdown', 'plaintext'],
                         },
                         synchronization: {
                             dynamicRegistration: false,
                             willSave: true,
-                            didSave: true
-                        }
-                    }
+                            didSave: true,
+                        },
+                    },
                 },
-                workspaceFolders: [{
-                    uri: 'file:///app/workspace',
-                    name: 'workspace'
-                }]
-            }
+                workspaceFolders: [
+                    {
+                        uri: 'file:///app/workspace',
+                        name: 'workspace',
+                    },
+                ],
+            },
         };
 
         this.sendLSPRequest(initializeRequest);
@@ -342,7 +360,7 @@ class PythonIDE {
             this.sendLSPRequest({
                 jsonrpc: '2.0',
                 method: 'initialized',
-                params: {}
+                params: {},
             });
 
             this.setupAdvancedFeatures();
@@ -355,21 +373,21 @@ class PythonIDE {
             triggerCharacters: ['.', ' '],
             provideCompletionItems: async (model, position) => {
                 return this.getCompletionItems(model, position);
-            }
+            },
         });
 
         // Go-to-definition
         monaco.languages.registerDefinitionProvider('python', {
             provideDefinition: async (model, position) => {
                 return this.getDefinition(model, position);
-            }
+            },
         });
 
         // Hover information
         monaco.languages.registerHoverProvider('python', {
             provideHover: async (model, position) => {
                 return this.getHover(model, position);
-            }
+            },
         });
     }
 
@@ -379,7 +397,7 @@ class PythonIDE {
                 // Basic Python formatting
                 const value = model.getValue();
                 const lines = value.split('\\n');
-                const formatted = lines.map(line => {
+                const formatted = lines.map((line) => {
                     // Basic indentation fixes
                     return line.replace(/^\\s+/, (match) => {
                         const spaces = match.length;
@@ -388,11 +406,13 @@ class PythonIDE {
                     });
                 });
 
-                return [{
-                    range: model.getFullModelRange(),
-                    text: formatted.join('\\n')
-                }];
-            }
+                return [
+                    {
+                        range: model.getFullModelRange(),
+                        text: formatted.join('\\n'),
+                    },
+                ];
+            },
         });
     }
 
@@ -424,8 +444,8 @@ class PythonIDE {
                 headers: this.getFetchHeaders(),
                 body: JSON.stringify({
                     code: code,
-                    filename: this.activeFile
-                })
+                    filename: this.activeFile,
+                }),
             });
 
             const result = await response.json();
@@ -435,20 +455,23 @@ class PythonIDE {
 
             // Add new markers if there are errors
             if (result.status === 'error' && result.errors) {
-                const markers = result.errors.map(error => {
+                const markers = result.errors.map((error) => {
                     // Get line content to determine end column
                     const lineContent = model.getLineContent(error.line);
-                    const endColumn = error.endColumn || (error.column + Math.min(lineContent.length - error.column + 1, 20));
+                    const endColumn =
+                        error.endColumn ||
+                        error.column + Math.min(lineContent.length - error.column + 1, 20);
 
                     return {
-                        severity: error.severity === 'error'
-                            ? monaco.MarkerSeverity.Error
-                            : monaco.MarkerSeverity.Warning,
+                        severity:
+                            error.severity === 'error'
+                                ? monaco.MarkerSeverity.Error
+                                : monaco.MarkerSeverity.Warning,
                         startLineNumber: error.line,
                         startColumn: error.column,
                         endLineNumber: error.endLine || error.line,
                         endColumn: endColumn,
-                        message: `${error.type}: ${error.message}`
+                        message: `${error.type}: ${error.message}`,
                     };
                 });
 
@@ -484,12 +507,14 @@ class PythonIDE {
                 params: {
                     textDocument: {
                         uri: fileUri,
-                        version: Date.now()
+                        version: Date.now(),
                     },
-                    contentChanges: [{
-                        text: text
-                    }]
-                }
+                    contentChanges: [
+                        {
+                            text: text,
+                        },
+                    ],
+                },
             });
 
             // Request completion
@@ -499,13 +524,13 @@ class PythonIDE {
                 method: 'textDocument/completion',
                 params: {
                     textDocument: {
-                        uri: fileUri
+                        uri: fileUri,
                     },
                     position: {
                         line: position.lineNumber - 1,
-                        character: position.column - 1
-                    }
-                }
+                        character: position.column - 1,
+                    },
+                },
             };
 
             return new Promise((resolve) => {
@@ -537,24 +562,47 @@ class PythonIDE {
                 insertText: snippet.body.join('\n'),
                 insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                 documentation: snippet.description,
-                detail: 'Python Snippet'
+                detail: 'Python Snippet',
             });
         });
 
         // Add basic Python keywords
         const keywords = [
-            'def', 'class', 'if', 'elif', 'else', 'for', 'while',
-            'try', 'except', 'finally', 'with', 'import', 'from',
-            'return', 'yield', 'pass', 'break', 'continue', 'lambda',
-            'and', 'or', 'not', 'in', 'is', 'None', 'True', 'False'
+            'def',
+            'class',
+            'if',
+            'elif',
+            'else',
+            'for',
+            'while',
+            'try',
+            'except',
+            'finally',
+            'with',
+            'import',
+            'from',
+            'return',
+            'yield',
+            'pass',
+            'break',
+            'continue',
+            'lambda',
+            'and',
+            'or',
+            'not',
+            'in',
+            'is',
+            'None',
+            'True',
+            'False',
         ];
 
-        keywords.forEach(keyword => {
+        keywords.forEach((keyword) => {
             suggestions.push({
                 label: keyword,
                 kind: monaco.languages.CompletionItemKind.Keyword,
                 insertText: keyword,
-                detail: 'Python Keyword'
+                detail: 'Python Keyword',
             });
         });
 
@@ -567,13 +615,13 @@ class PythonIDE {
             this.completionResolve = null;
 
             if (response.result && response.result.items) {
-                const suggestions = response.result.items.map(item => ({
+                const suggestions = response.result.items.map((item) => ({
                     label: item.label,
                     kind: this.convertCompletionItemKind(item.kind),
                     insertText: item.insertText || item.label,
                     detail: item.detail || '',
                     documentation: item.documentation || '',
-                    sortText: item.sortText
+                    sortText: item.sortText,
                 }));
 
                 resolve({ suggestions });
@@ -599,7 +647,7 @@ class PythonIDE {
             12: monaco.languages.CompletionItemKind.Value,
             13: monaco.languages.CompletionItemKind.Enum,
             14: monaco.languages.CompletionItemKind.Keyword,
-            15: monaco.languages.CompletionItemKind.Snippet
+            15: monaco.languages.CompletionItemKind.Snippet,
         };
 
         return kindMap[lspKind] || monaco.languages.CompletionItemKind.Text;
@@ -634,13 +682,13 @@ class PythonIDE {
                 method: 'textDocument/definition',
                 params: {
                     textDocument: {
-                        uri: fileUri
+                        uri: fileUri,
                     },
                     position: {
                         line: position.lineNumber - 1,
-                        character: position.column - 1
-                    }
-                }
+                        character: position.column - 1,
+                    },
+                },
             };
 
             return new Promise((resolve) => {
@@ -677,16 +725,18 @@ class PythonIDE {
             params: {
                 textDocument: {
                     uri: fileUri,
-                    version: Date.now()
+                    version: Date.now(),
                 },
-                contentChanges: [{
-                    text: content
-                }]
-            }
+                contentChanges: [
+                    {
+                        text: content,
+                    },
+                ],
+            },
         });
 
         // Give LSP time to process the change
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     handleDefinitionResponse(response) {
@@ -696,7 +746,9 @@ class PythonIDE {
 
             if (response.result) {
                 // Handle both array and single object results
-                const locations = Array.isArray(response.result) ? response.result : [response.result];
+                const locations = Array.isArray(response.result)
+                    ? response.result
+                    : [response.result];
 
                 if (locations.length > 0) {
                     const location = locations[0];
@@ -721,8 +773,8 @@ class PythonIDE {
                                 startLineNumber: location.range.start.line + 1,
                                 startColumn: location.range.start.character + 1,
                                 endLineNumber: location.range.end.line + 1,
-                                endColumn: location.range.end.character + 1
-                            }
+                                endColumn: location.range.end.character + 1,
+                            },
                         });
                         return;
                     }
@@ -754,13 +806,13 @@ class PythonIDE {
                 method: 'textDocument/hover',
                 params: {
                     textDocument: {
-                        uri: fileUri
+                        uri: fileUri,
                     },
                     position: {
                         line: position.lineNumber - 1,
-                        character: position.column - 1
-                    }
-                }
+                        character: position.column - 1,
+                    },
+                },
             };
 
             return new Promise((resolve) => {
@@ -788,9 +840,9 @@ class PythonIDE {
             if (response.result && response.result.contents) {
                 let content = '';
                 if (Array.isArray(response.result.contents)) {
-                    content = response.result.contents.map(c =>
-                        typeof c === 'string' ? c : c.value
-                    ).join('\n\n');
+                    content = response.result.contents
+                        .map((c) => (typeof c === 'string' ? c : c.value))
+                        .join('\n\n');
                 } else if (typeof response.result.contents === 'string') {
                     content = response.result.contents;
                 } else if (response.result.contents.value) {
@@ -798,9 +850,11 @@ class PythonIDE {
                 }
 
                 resolve({
-                    contents: [{
-                        value: content
-                    }]
+                    contents: [
+                        {
+                            value: content,
+                        },
+                    ],
                 });
             } else {
                 resolve(null);
@@ -826,26 +880,32 @@ class PythonIDE {
             await this.openFile(definition.filePath);
 
             // Get the editor that now has the file open
-            const targetEditor = this.splitViewActive && this.focusedEditor === 'right'
-                ? this.rightEditor
-                : this.editor;
+            const targetEditor =
+                this.splitViewActive && this.focusedEditor === 'right'
+                    ? this.rightEditor
+                    : this.editor;
 
             if (!targetEditor) return;
 
             // Navigate to the definition position
             targetEditor.setPosition({
                 lineNumber: definition.range.startLineNumber,
-                column: definition.range.startColumn
+                column: definition.range.startColumn,
             });
 
             // Highlight the definition briefly
-            const decorations = targetEditor.deltaDecorations([], [{
-                range: definition.range,
-                options: {
-                    className: 'highlight-definition',
-                    isWholeLine: false
-                }
-            }]);
+            const decorations = targetEditor.deltaDecorations(
+                [],
+                [
+                    {
+                        range: definition.range,
+                        options: {
+                            className: 'highlight-definition',
+                            isWholeLine: false,
+                        },
+                    },
+                ]
+            );
 
             setTimeout(() => {
                 try {
@@ -909,30 +969,38 @@ class PythonIDE {
                 startLineNumber: position.lineNumber,
                 startColumn: word.startColumn,
                 endLineNumber: position.lineNumber,
-                endColumn: word.endColumn
+                endColumn: word.endColumn,
             };
 
             if (editorSide === 'right') {
                 this.rightCurrentLinkDecorations = editor.deltaDecorations(
                     this.rightCurrentLinkDecorations || [],
-                    [{
-                        range: range,
-                        options: {
-                            inlineClassName: 'ctrl-hover-link',
-                            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
-                        }
-                    }]
+                    [
+                        {
+                            range: range,
+                            options: {
+                                inlineClassName: 'ctrl-hover-link',
+                                stickiness:
+                                    monaco.editor.TrackedRangeStickiness
+                                        .NeverGrowsWhenTypingAtEdges,
+                            },
+                        },
+                    ]
                 );
             } else {
                 this.currentLinkDecorations = editor.deltaDecorations(
                     this.currentLinkDecorations || [],
-                    [{
-                        range: range,
-                        options: {
-                            inlineClassName: 'ctrl-hover-link',
-                            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
-                        }
-                    }]
+                    [
+                        {
+                            range: range,
+                            options: {
+                                inlineClassName: 'ctrl-hover-link',
+                                stickiness:
+                                    monaco.editor.TrackedRangeStickiness
+                                        .NeverGrowsWhenTypingAtEdges,
+                            },
+                        },
+                    ]
                 );
             }
         } else {
@@ -1000,9 +1068,9 @@ class PythonIDE {
                         uri: fileUri,
                         languageId: 'python',
                         version: 1,
-                        text: content
-                    }
-                }
+                        text: content,
+                    },
+                },
             });
         }
     }
@@ -1025,12 +1093,14 @@ class PythonIDE {
                 params: {
                     textDocument: {
                         uri: fileUri,
-                        version: Date.now()
+                        version: Date.now(),
                     },
-                    contentChanges: [{
-                        text: content
-                    }]
-                }
+                    contentChanges: [
+                        {
+                            text: content,
+                        },
+                    ],
+                },
             });
         }
     }
@@ -1058,7 +1128,9 @@ class PythonIDE {
 
             // Restore selected directory highlight after refresh
             if (this.selectedDirectory) {
-                const selectedElement = document.querySelector(`[data-path="${this.selectedDirectory}"][data-type="directory"]`);
+                const selectedElement = document.querySelector(
+                    `[data-path="${this.selectedDirectory}"][data-type="directory"]`
+                );
                 if (selectedElement) {
                     selectedElement.classList.add('selected');
                 } else {
@@ -1077,7 +1149,7 @@ class PythonIDE {
             this.setupExplorerDropZone(container);
         }
 
-        files.forEach(item => {
+        files.forEach((item) => {
             const element = document.createElement('div');
 
             if (item.type === 'directory') {
@@ -1118,7 +1190,7 @@ class PythonIDE {
                     e.stopPropagation();
 
                     // Clear previous selections
-                    document.querySelectorAll('.file-item.selected').forEach(el => {
+                    document.querySelectorAll('.file-item.selected').forEach((el) => {
                         el.classList.remove('selected');
                     });
 
@@ -1217,17 +1289,20 @@ class PythonIDE {
     setupDragEvents(element, item) {
         element.addEventListener('dragstart', (e) => {
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('application/json', JSON.stringify({
-                path: item.path,
-                name: item.name,
-                type: item.type
-            }));
+            e.dataTransfer.setData(
+                'application/json',
+                JSON.stringify({
+                    path: item.path,
+                    name: item.name,
+                    type: item.type,
+                })
+            );
             element.classList.add('dragging');
         });
 
         element.addEventListener('dragend', (e) => {
             element.classList.remove('dragging');
-            document.querySelectorAll('.drag-over').forEach(el => {
+            document.querySelectorAll('.drag-over').forEach((el) => {
                 el.classList.remove('drag-over');
             });
         });
@@ -1322,8 +1397,8 @@ class PythonIDE {
                 headers: this.getFetchHeaders(),
                 body: JSON.stringify({
                     source: draggedItem.path,
-                    destination: newPath
-                })
+                    destination: newPath,
+                }),
             });
 
             if (!response.ok) {
@@ -1393,7 +1468,7 @@ class PythonIDE {
                     // Store file with its relative path
                     allFiles.push({
                         file: file,
-                        relativePath: path + file.name
+                        relativePath: path + file.name,
                     });
                     resolve();
                 }, reject);
@@ -1443,13 +1518,14 @@ class PythonIDE {
 
             formData.append('targetPath', targetPath);
 
-            const url = (this.workspaceFolder && this.workspaceFolder.trim() !== '')
-                ? `/api/upload?folder=${encodeURIComponent(this.workspaceFolder)}`
-                : '/api/upload';
+            const url =
+                this.workspaceFolder && this.workspaceFolder.trim() !== ''
+                    ? `/api/upload?folder=${encodeURIComponent(this.workspaceFolder)}`
+                    : '/api/upload';
 
             const response = await fetch(url, {
                 method: 'POST',
-                body: formData
+                body: formData,
             });
 
             if (!response.ok) {
@@ -1498,15 +1574,22 @@ class PythonIDE {
                 return icon('react', '#3178c6');
             case 'json':
                 return icon('json', '#f0db4f');
-            case 'html': case 'htm':
+            case 'html':
+            case 'htm':
                 return icon('code', '#e34c26');
-            case 'css': case 'scss': case 'sass':
+            case 'css':
+            case 'scss':
+            case 'sass':
                 return icon('symbol-color', '#5d8fdb');
-            case 'md': case 'markdown':
+            case 'md':
+            case 'markdown':
                 return icon('markdown', '#c5c5c5');
             case 'txt':
                 return icon('file', '#c5c5c5');
-            case 'yml': case 'yaml': case 'config': case 'conf':
+            case 'yml':
+            case 'yaml':
+            case 'config':
+            case 'conf':
                 return icon('settings-gear', '#e65c5c');
             case 'xml':
                 return icon('code', '#c5c5c5');
@@ -1516,13 +1599,16 @@ class PythonIDE {
                 return icon('output', '#c5c5c5');
             case 'sql':
                 return icon('database', '#c5c5c5');
-            case 'sh': case 'bash':
+            case 'sh':
+            case 'bash':
                 return icon('terminal-bash', '#6bc267');
             case 'php':
                 return icon('symbol-method', '#9b7cc4');
             case 'java':
                 return icon('symbol-method', '#5d9bd6');
-            case 'c': case 'cpp': case 'h':
+            case 'c':
+            case 'cpp':
+            case 'h':
                 return icon('file-code', '#5d9bd6');
             case 'go':
                 return icon('symbol-method', '#5dc9e2');
@@ -1530,7 +1616,8 @@ class PythonIDE {
                 return icon('file-code', '#e6b8a2');
             case 'swift':
                 return icon('symbol-method', '#f27b5b');
-            case 'kt': case 'kts':
+            case 'kt':
+            case 'kts':
                 return icon('file-code', '#a87dff');
             case 'rb':
                 return icon('ruby', '#e65c5c');
@@ -1542,9 +1629,15 @@ class PythonIDE {
                 return icon('diff-ignored', '#c5c5c5');
             case 'lock':
                 return icon('lock', '#c5c5c5');
-            case 'zip': case 'tar': case 'gz':
+            case 'zip':
+            case 'tar':
+            case 'gz':
                 return icon('file-zip', '#c5c5c5');
-            case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg':
+            case 'png':
+            case 'jpg':
+            case 'jpeg':
+            case 'gif':
+            case 'svg':
                 return icon('file-media', '#c58ae0');
             case 'pdf':
                 return icon('file-pdf', '#f46060');
@@ -1556,14 +1649,14 @@ class PythonIDE {
     getFileIconColor(ext) {
         // Return color for each file type (for reference, actual color is in SVG)
         const colors = {
-            'py': '#3776ab',
-            'js': '#f0db4f',
-            'jsx': '#f0db4f',
-            'ts': '#3178c6',
-            'tsx': '#3178c6',
-            'html': '#e34c26',
-            'css': '#264de4',
-            'json': '#858585',
+            py: '#3776ab',
+            js: '#f0db4f',
+            jsx: '#f0db4f',
+            ts: '#3178c6',
+            tsx: '#3178c6',
+            html: '#e34c26',
+            css: '#264de4',
+            json: '#858585',
         };
         return colors[ext] || '#858585';
     }
@@ -1628,7 +1721,7 @@ class PythonIDE {
             this.openTabs.set(filepath, {
                 model,
                 saved: true,
-                isStdlib: filepath.startsWith('/usr/local/lib/python3.11/')
+                isStdlib: filepath.startsWith('/usr/local/lib/python3.11/'),
             });
 
             // Notify language server for all Python files
@@ -1636,7 +1729,6 @@ class PythonIDE {
 
             this.createTab(filepath);
             this.switchToTab(filepath);
-
         } catch (error) {
             console.error('Failed to open file:', error);
             // Show user-friendly error message
@@ -1650,11 +1742,16 @@ class PythonIDE {
             case 'py':
             case 'pyi': // Python stub files
                 return 'python';
-            case 'js': return 'javascript';
-            case 'json': return 'json';
-            case 'html': return 'html';
-            case 'css': return 'css';
-            default: return 'plaintext';
+            case 'js':
+                return 'javascript';
+            case 'json':
+                return 'json';
+            case 'html':
+                return 'html';
+            case 'css':
+                return 'css';
+            default:
+                return 'plaintext';
         }
     }
 
@@ -1699,7 +1796,7 @@ class PythonIDE {
 
         tab.addEventListener('dragend', (e) => {
             tab.classList.remove('dragging');
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+            document.querySelectorAll('.tab').forEach((t) => t.classList.remove('drag-over'));
         });
 
         tab.addEventListener('dragover', (e) => {
@@ -1730,7 +1827,7 @@ class PythonIDE {
 
     switchToTab(filepath) {
         // Update active tab styling
-        document.querySelectorAll('.tab').forEach(tab => {
+        document.querySelectorAll('.tab').forEach((tab) => {
             tab.classList.remove('active');
         });
 
@@ -1753,7 +1850,7 @@ class PythonIDE {
 
             // Show execute button for Python files (not for stdlib files)
             const isPython = filepath.endsWith('.py');
-            this.executeButton.style.display = (isPython && !tabData.isStdlib) ? 'block' : 'none';
+            this.executeButton.style.display = isPython && !tabData.isStdlib ? 'block' : 'none';
 
             // Setup sync if same file is open in both editors
             if (this.splitViewActive) {
@@ -1800,7 +1897,7 @@ class PythonIDE {
             await fetch(this.buildUrl(`/api/files/${filepath}`), {
                 method: 'POST',
                 headers: this.getFetchHeaders(),
-                body: JSON.stringify({ content })
+                body: JSON.stringify({ content }),
             });
 
             tabData.saved = true;
@@ -1812,7 +1909,8 @@ class PythonIDE {
     async executeCode(editorGroup = 'left') {
         const activeFile = editorGroup === 'left' ? this.activeFile : this.rightActiveFile;
         const openTabs = editorGroup === 'left' ? this.openTabs : this.rightOpenTabs;
-        const outputPanel = editorGroup === 'left' ? this.outputPanel : document.getElementById('outputPanel2');
+        const outputPanel =
+            editorGroup === 'left' ? this.outputPanel : document.getElementById('outputPanel2');
 
         if (!activeFile || !activeFile.endsWith('.py')) return;
 
@@ -1832,16 +1930,17 @@ class PythonIDE {
             const response = await fetch('/api/execute', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ code, filename })
+                body: JSON.stringify({ code, filename }),
             });
 
             const result = await response.json();
 
             if (outputPanel) {
                 if (result.success) {
-                    outputPanel.textContent = result.output || 'Code executed successfully (no output)';
+                    outputPanel.textContent =
+                        result.output || 'Code executed successfully (no output)';
                 } else {
                     outputPanel.className = 'output-panel error';
                     outputPanel.textContent = result.error || 'Execution failed';
@@ -1946,9 +2045,12 @@ class PythonIDE {
 
         // Click on empty space to deselect
         this.fileExplorer.addEventListener('click', (e) => {
-            if (e.target === this.fileExplorer || (e.target.classList.contains('folder-content') && e.target.children.length === 0)) {
+            if (
+                e.target === this.fileExplorer ||
+                (e.target.classList.contains('folder-content') && e.target.children.length === 0)
+            ) {
                 // Clear previous selections
-                document.querySelectorAll('.file-item.selected').forEach(el => {
+                document.querySelectorAll('.file-item.selected').forEach((el) => {
                     el.classList.remove('selected');
                 });
                 this.selectedDirectory = '';
@@ -1987,7 +2089,9 @@ class PythonIDE {
             if (!name) return;
 
             try {
-                const fullPath = this.selectedDirectory ? `${this.selectedDirectory}/${name}` : name;
+                const fullPath = this.selectedDirectory
+                    ? `${this.selectedDirectory}/${name}`
+                    : name;
 
                 // Check if file/folder already exists
                 if (await this.checkIfFileExists(fullPath)) {
@@ -2016,14 +2120,14 @@ class PythonIDE {
     }
 
     async createFile(filename) {
-        const content = filename.endsWith('.py') ?
-            `#!/usr/bin/env python3\n\"\"\"\n${filename} - Description\n\"\"\"\n\n\ndef main():\n    pass\n\n\nif __name__ == "__main__":\n    main()\n` :
-            '';
+        const content = filename.endsWith('.py')
+            ? `#!/usr/bin/env python3\n"""\n${filename} - Description\n"""\n\n\ndef main():\n    pass\n\n\nif __name__ == "__main__":\n    main()\n`
+            : '';
 
         const response = await fetch(this.buildUrl(`/api/files/${filename}`), {
             method: 'POST',
             headers: this.getFetchHeaders(),
-            body: JSON.stringify({ content })
+            body: JSON.stringify({ content }),
         });
 
         if (!response.ok) {
@@ -2036,7 +2140,7 @@ class PythonIDE {
         const response = await fetch(this.buildUrl('/api/mkdir'), {
             method: 'POST',
             headers: this.getFetchHeaders(),
-            body: JSON.stringify({ path: foldername })
+            body: JSON.stringify({ path: foldername }),
         });
 
         if (!response.ok) {
@@ -2055,7 +2159,7 @@ class PythonIDE {
 
     closeDialog() {
         const dialogs = document.querySelectorAll('.input-dialog');
-        dialogs.forEach(dialog => dialog.remove());
+        dialogs.forEach((dialog) => dialog.remove());
 
         // Keep selected directory when dialog is closed (don't clear)
         // This allows users to create multiple files in the same directory
@@ -2063,7 +2167,7 @@ class PythonIDE {
 
     closeContextMenu() {
         const menus = document.querySelectorAll('.context-menu');
-        menus.forEach(menu => menu.remove());
+        menus.forEach((menu) => menu.remove());
     }
 
     updateFilePathDisplay(filepath, isStdlib = false) {
@@ -2089,13 +2193,15 @@ class PythonIDE {
 
     updateActiveFileHighlight() {
         // Clear all active highlights
-        document.querySelectorAll('.file-item.active').forEach(el => {
+        document.querySelectorAll('.file-item.active').forEach((el) => {
             el.classList.remove('active');
         });
 
         // Highlight current active file
         if (this.activeFile) {
-            const activeElement = document.querySelector(`[data-path="${this.activeFile}"][data-type="file"]`);
+            const activeElement = document.querySelector(
+                `[data-path="${this.activeFile}"][data-type="file"]`
+            );
             if (activeElement) {
                 activeElement.classList.add('active');
             }
@@ -2142,13 +2248,24 @@ class PythonIDE {
         menu.style.top = event.pageY + 'px';
 
         const filename = filepath.split('/').pop();
-        const tabData = editorGroup === 'left' ? this.openTabs.get(filepath) : this.rightOpenTabs.get(filepath);
+        const tabData =
+            editorGroup === 'left' ? this.openTabs.get(filepath) : this.rightOpenTabs.get(filepath);
         const isStdlib = tabData?.isStdlib || false;
 
-        const closeAction = editorGroup === 'left' ? () => this.closeTab(filepath) : () => this.closeTabInSplit(filepath);
-        const closeOthersAction = editorGroup === 'left' ? () => this.closeOtherTabs(filepath) : () => this.closeOtherTabsInSplit(filepath);
-        const closeAllAction = editorGroup === 'left' ? () => this.closeAllTabs() : () => this.closeAllTabsInSplit();
-        const closeRightAction = editorGroup === 'left' ? () => this.closeTabsToRight(filepath) : () => this.closeTabsToRightInSplit(filepath);
+        const closeAction =
+            editorGroup === 'left'
+                ? () => this.closeTab(filepath)
+                : () => this.closeTabInSplit(filepath);
+        const closeOthersAction =
+            editorGroup === 'left'
+                ? () => this.closeOtherTabs(filepath)
+                : () => this.closeOtherTabsInSplit(filepath);
+        const closeAllAction =
+            editorGroup === 'left' ? () => this.closeAllTabs() : () => this.closeAllTabsInSplit();
+        const closeRightAction =
+            editorGroup === 'left'
+                ? () => this.closeTabsToRight(filepath)
+                : () => this.closeTabsToRightInSplit(filepath);
 
         const menuItems = [
             { text: 'Close', action: closeAction },
@@ -2169,7 +2286,7 @@ class PythonIDE {
             );
         }
 
-        menuItems.forEach(item => {
+        menuItems.forEach((item) => {
             if (item.separator) {
                 const separator = document.createElement('div');
                 separator.className = 'context-menu-separator';
@@ -2196,7 +2313,7 @@ class PythonIDE {
 
     closeOtherTabs(keepFilepath) {
         const allTabs = Array.from(document.querySelectorAll('.tab'));
-        allTabs.forEach(tab => {
+        allTabs.forEach((tab) => {
             const filepath = tab.dataset.filepath;
             if (filepath !== keepFilepath) {
                 this.closeTab(filepath);
@@ -2206,14 +2323,14 @@ class PythonIDE {
 
     closeAllTabs() {
         const allTabs = Array.from(document.querySelectorAll('.tab'));
-        allTabs.forEach(tab => {
+        allTabs.forEach((tab) => {
             this.closeTab(tab.dataset.filepath);
         });
     }
 
     closeTabsToRight(fromFilepath) {
         const allTabs = Array.from(document.querySelectorAll('.tab'));
-        const fromIndex = allTabs.findIndex(tab => tab.dataset.filepath === fromFilepath);
+        const fromIndex = allTabs.findIndex((tab) => tab.dataset.filepath === fromFilepath);
 
         if (fromIndex !== -1) {
             for (let i = fromIndex + 1; i < allTabs.length; i++) {
@@ -2221,7 +2338,6 @@ class PythonIDE {
             }
         }
     }
-
 
     setupSplitResize(divider, leftGroup, rightGroup) {
         let isDragging = false;
@@ -2306,7 +2422,7 @@ class PythonIDE {
             this.rightOpenTabs.set(filepath, {
                 model,
                 saved: true,
-                isStdlib: filepath.startsWith('/usr/local/lib/python3.11/')
+                isStdlib: filepath.startsWith('/usr/local/lib/python3.11/'),
             });
 
             // Notify language server for all Python files
@@ -2314,7 +2430,6 @@ class PythonIDE {
 
             this.createTabInSplit(filepath);
             this.switchToTabInSplit(filepath);
-
         } catch (error) {
             console.error('Failed to open file in split:', error);
             alert(`Could not open file: ${filepath.split('/').pop()}\nError: ${error.message}`);
@@ -2361,7 +2476,7 @@ class PythonIDE {
 
         tab.addEventListener('dragend', (e) => {
             tab.classList.remove('dragging');
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+            document.querySelectorAll('.tab').forEach((t) => t.classList.remove('drag-over'));
         });
 
         tab.addEventListener('dragover', (e) => {
@@ -2392,7 +2507,7 @@ class PythonIDE {
 
     switchToTabInSplit(filepath) {
         // Update active tab styling
-        document.querySelectorAll('#tabBar2 .tab').forEach(tab => {
+        document.querySelectorAll('#tabBar2 .tab').forEach((tab) => {
             tab.classList.remove('active');
         });
 
@@ -2417,7 +2532,7 @@ class PythonIDE {
             const executeButton2 = document.getElementById('executeButton2');
             if (executeButton2) {
                 const isPython = filepath.endsWith('.py');
-                executeButton2.style.display = (isPython && !tabData.isStdlib) ? 'block' : 'none';
+                executeButton2.style.display = isPython && !tabData.isStdlib ? 'block' : 'none';
             }
 
             // Setup sync if same file is open in both editors
@@ -2454,7 +2569,7 @@ class PythonIDE {
 
     closeOtherTabsInSplit(keepFilepath) {
         const allTabs = Array.from(document.querySelectorAll('#tabBar2 .tab'));
-        allTabs.forEach(tab => {
+        allTabs.forEach((tab) => {
             const filepath = tab.dataset.filepath;
             if (filepath !== keepFilepath) {
                 this.closeTabInSplit(filepath);
@@ -2464,14 +2579,14 @@ class PythonIDE {
 
     closeAllTabsInSplit() {
         const allTabs = Array.from(document.querySelectorAll('#tabBar2 .tab'));
-        allTabs.forEach(tab => {
+        allTabs.forEach((tab) => {
             this.closeTabInSplit(tab.dataset.filepath);
         });
     }
 
     closeTabsToRightInSplit(fromFilepath) {
         const allTabs = Array.from(document.querySelectorAll('#tabBar2 .tab'));
-        const fromIndex = allTabs.findIndex(tab => tab.dataset.filepath === fromFilepath);
+        const fromIndex = allTabs.findIndex((tab) => tab.dataset.filepath === fromFilepath);
 
         if (fromIndex !== -1) {
             for (let i = fromIndex + 1; i < allTabs.length; i++) {
@@ -2497,7 +2612,7 @@ class PythonIDE {
                     this.openTabs.set(filepath, {
                         model: newModel,
                         saved: tabData.saved,
-                        isStdlib: tabData.isStdlib
+                        isStdlib: tabData.isStdlib,
                     });
                     this.createTab(filepath);
                 }
@@ -2511,7 +2626,7 @@ class PythonIDE {
         }
 
         // Dispose all right tab models
-        this.rightOpenTabs.forEach(tabData => {
+        this.rightOpenTabs.forEach((tabData) => {
             tabData.model.dispose();
         });
         this.rightOpenTabs.clear();
@@ -2561,7 +2676,7 @@ class PythonIDE {
             this.syncInProgress = true;
 
             // Apply changes to right model
-            e.changes.forEach(change => {
+            e.changes.forEach((change) => {
                 const range = new monaco.Range(
                     change.range.startLineNumber,
                     change.range.startColumn,
@@ -2570,10 +2685,12 @@ class PythonIDE {
                 );
                 rightModel.pushEditOperations(
                     [],
-                    [{
-                        range: range,
-                        text: change.text
-                    }],
+                    [
+                        {
+                            range: range,
+                            text: change.text,
+                        },
+                    ],
                     () => null
                 );
             });
@@ -2588,7 +2705,7 @@ class PythonIDE {
             this.syncInProgress = true;
 
             // Apply changes to left model
-            e.changes.forEach(change => {
+            e.changes.forEach((change) => {
                 const range = new monaco.Range(
                     change.range.startLineNumber,
                     change.range.startColumn,
@@ -2597,10 +2714,12 @@ class PythonIDE {
                 );
                 leftModel.pushEditOperations(
                     [],
-                    [{
-                        range: range,
-                        text: change.text
-                    }],
+                    [
+                        {
+                            range: range,
+                            text: change.text,
+                        },
+                    ],
                     () => null
                 );
             });
@@ -2611,7 +2730,7 @@ class PythonIDE {
         // Store listeners for cleanup
         this.modelChangeListeners.set(filepath, {
             leftListener,
-            rightListener
+            rightListener,
         });
     }
 
@@ -2692,12 +2811,12 @@ class PythonIDE {
             formatOnPaste: true,
             formatOnType: true,
             bracketPairColorization: {
-                enabled: true
+                enabled: true,
             },
             // Disable Monaco's built-in go-to-definition
             gotoLocation: {
-                multiple: 'goto'
-            }
+                multiple: 'goto',
+            },
         });
 
         this.splitViewActive = true;
@@ -2805,7 +2924,7 @@ class PythonIDE {
         targetTabs.set(filepath, {
             model: newModel,
             saved: tabData.saved,
-            isStdlib: tabData.isStdlib
+            isStdlib: tabData.isStdlib,
         });
 
         // Remove from source editor
@@ -2880,7 +2999,6 @@ class PythonIDE {
         }
     }
 
-
     showContextMenu(event, filePath, type) {
         this.closeContextMenu();
 
@@ -2907,7 +3025,11 @@ class PythonIDE {
                 { text: 'Copy Path', action: () => this.copyToClipboard(filePath) },
                 { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filePath}`) },
                 { separator: true },
-                { text: 'Delete', action: () => this.deleteItem(filePath, type), class: 'destructive' }
+                {
+                    text: 'Delete',
+                    action: () => this.deleteItem(filePath, type),
+                    class: 'destructive',
+                },
             ];
         } else {
             menuItems = [
@@ -2921,11 +3043,15 @@ class PythonIDE {
                 { text: 'Copy Path', action: () => this.copyToClipboard(filePath) },
                 { text: 'Copy Relative Path', action: () => this.copyToClipboard(`./${filePath}`) },
                 { separator: true },
-                { text: 'Delete', action: () => this.deleteItem(filePath, type), class: 'destructive' }
+                {
+                    text: 'Delete',
+                    action: () => this.deleteItem(filePath, type),
+                    class: 'destructive',
+                },
             ];
         }
 
-        menuItems.forEach(item => {
+        menuItems.forEach((item) => {
             if (item.separator) {
                 const separator = document.createElement('div');
                 separator.className = 'context-menu-separator';
@@ -2959,13 +3085,25 @@ class PythonIDE {
         menu.style.top = event.pageY + 'px';
 
         const menuItems = [
-            { text: 'New File', action: () => { this.selectedDirectory = ''; this.showCreateDialog('file'); } },
-            { text: 'New Folder', action: () => { this.selectedDirectory = ''; this.showCreateDialog('folder'); } },
+            {
+                text: 'New File',
+                action: () => {
+                    this.selectedDirectory = '';
+                    this.showCreateDialog('file');
+                },
+            },
+            {
+                text: 'New Folder',
+                action: () => {
+                    this.selectedDirectory = '';
+                    this.showCreateDialog('folder');
+                },
+            },
             { separator: true },
-            { text: 'Refresh', action: () => this.loadFileExplorer() }
+            { text: 'Refresh', action: () => this.loadFileExplorer() },
         ];
 
-        menuItems.forEach(item => {
+        menuItems.forEach((item) => {
             if (item.separator) {
                 const separator = document.createElement('div');
                 separator.className = 'context-menu-separator';
@@ -3082,7 +3220,7 @@ class PythonIDE {
 
         try {
             const response = await fetch(`/api/files/${filePath}`, {
-                method: 'DELETE'
+                method: 'DELETE',
             });
 
             if (!response.ok) {
@@ -3095,7 +3233,10 @@ class PythonIDE {
             }
 
             // Clear selected directory if it was deleted or is a child of deleted directory
-            if (this.selectedDirectory === filePath || this.selectedDirectory.startsWith(filePath + '/')) {
+            if (
+                this.selectedDirectory === filePath ||
+                this.selectedDirectory.startsWith(filePath + '/')
+            ) {
                 this.selectedDirectory = '';
             }
 
@@ -3116,7 +3257,7 @@ class PythonIDE {
         await fetch(`/api/files/${newPath}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: data.content })
+            body: JSON.stringify({ content: data.content }),
         });
 
         // Delete old file
@@ -3155,7 +3296,7 @@ class PythonIDE {
             await fetch(`/api/files/${targetPath}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: data.content })
+                body: JSON.stringify({ content: data.content }),
             });
         } else {
             // For directories, we'd need server-side support
@@ -3173,20 +3314,23 @@ class PythonIDE {
     }
 
     copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            // Show brief success message
-            const msg = document.createElement('div');
-            msg.style.cssText = `
+        navigator.clipboard
+            .writeText(text)
+            .then(() => {
+                // Show brief success message
+                const msg = document.createElement('div');
+                msg.style.cssText = `
                 position: fixed; top: 20px; right: 20px; background: #4CAF50;
                 color: white; padding: 8px 16px; border-radius: 4px; z-index: 9999;
                 font-size: 14px; pointer-events: none;
             `;
-            msg.textContent = 'Path copied to clipboard';
-            document.body.appendChild(msg);
-            setTimeout(() => msg.remove(), 2000);
-        }).catch(() => {
-            alert('Failed to copy to clipboard');
-        });
+                msg.textContent = 'Path copied to clipboard';
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 2000);
+            })
+            .catch(() => {
+                alert('Failed to copy to clipboard');
+            });
     }
 
     downloadItem(filePath) {
@@ -3233,5 +3377,5 @@ self.MonacoEnvironment = {
             return './monaco-editor/esm/vs/language/typescript/ts.worker.js';
         }
         return './monaco-editor/esm/vs/editor/editor.worker.js';
-    }
+    },
 };

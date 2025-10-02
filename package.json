@@ -1,21 +1,35 @@
 {
-  "name": "py-editor",
-  "version": "1.0.0",
-  "description": "Lightweight Python IDE for containerized development",
-  "main": "server/index.js",
-  "scripts": {
-    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
-    "server:dev": "cd server && npm run dev",
-    "client:dev": "cd client && npm run dev",
-    "build": "cd client && npm run build",
-    "start": "cd server && npm start",
-    "docker:build": "docker build -t py-editor .",
-    "docker:run": "docker run -p 8080:8080 -v $(pwd)/workspace:/app/workspace py-editor"
-  },
-  "keywords": ["python", "ide", "docker", "editor"],
-  "author": "py-editor",
-  "license": "MIT",
-  "devDependencies": {
-    "concurrently": "^8.2.2"
-  }
+    "name": "py-editor",
+    "version": "1.0.0",
+    "description": "Lightweight Python IDE for containerized development",
+    "main": "server/index.js",
+    "scripts": {
+        "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+        "server:dev": "cd server && npm run dev",
+        "client:dev": "cd client && npm run dev",
+        "build": "cd client && npm run build",
+        "start": "cd server && npm start",
+        "docker:build": "docker build -t py-editor .",
+        "docker:run": "docker run -p 8080:8080 -v $(pwd)/workspace:/app/workspace py-editor",
+        "lint": "eslint . --ext .js",
+        "lint:fix": "eslint . --ext .js --fix",
+        "format": "prettier --write \"**/*.{js,json,md,yml,yaml}\"",
+        "format:check": "prettier --check \"**/*.{js,json,md,yml,yaml}\"",
+        "prepare": "husky install"
+    },
+    "keywords": [
+        "python",
+        "ide",
+        "docker",
+        "editor"
+    ],
+    "author": "py-editor",
+    "license": "MIT",
+    "devDependencies": {
+        "concurrently": "^8.2.2",
+        "eslint": "^8.54.0",
+        "prettier": "^3.1.0",
+        "husky": "^8.0.3",
+        "lint-staged": "^15.1.0"
+    }
 }
