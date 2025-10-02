@@ -156,7 +156,12 @@ if condition:
 
 ### 스니펫 커스터마이징
 
-`snippets/python.json` 파일 수정:
+스니펫은 Docker 이미지에 포함되어 있습니다 (`/app/snippets/python.json`).
+
+**커스터마이징 방법**:
+
+1. `snippets/python.json` 파일 수정
+2. Docker 이미지 재빌드
 
 ```json
 {
@@ -175,12 +180,10 @@ if condition:
 }
 ```
 
-**Docker 컨테이너에 적용**:
 ```bash
-docker run -p 8080:8080 \
-  -v $(pwd)/workspace:/app/workspace \
-  -v $(pwd)/custom-snippets.json:/app/snippets/python.json \
-  py-editor
+# 재빌드 후 실행
+npm run docker:build
+npm run docker:run
 ```
 
 ### 워크스페이스 폴더 선택
@@ -203,6 +206,171 @@ docker run -p 8080:8080 \
   -v $(pwd)/workspace:/app/workspace \
   py-editor
 ```
+
+## 🚢 프로덕션 배포
+
+### Docker Registry에 푸시
+
+```bash
+# 1. 이미지 태깅 (버전 관리)
+docker tag py-editor your-registry.com/py-editor:1.0.0
+docker tag py-editor your-registry.com/py-editor:latest
+
+# 2. Registry에 푸시
+docker push your-registry.com/py-editor:1.0.0
+docker push your-registry.com/py-editor:latest
+```
+
+### Kubernetes 배포
+
+**deployment.yaml**:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: py-editor
+  labels:
+    app: py-editor
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: py-editor
+  template:
+    metadata:
+      labels:
+        app: py-editor
+    spec:
+      containers:
+      - name: py-editor
+        image: your-registry.com/py-editor:1.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: workspace
+          mountPath: /app/workspace
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: py-editor-workspace-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: py-editor-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: py-editor
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: py-editor-workspace-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+```
+
+**배포 명령어**:
+```bash
+kubectl apply -f deployment.yaml
+
+# 배포 확인
+kubectl get pods -l app=py-editor
+kubectl get svc py-editor-service
+
+# 로그 확인
+kubectl logs -f deployment/py-editor
+```
+
+### Docker Compose
+
+**docker-compose.yml**:
+```yaml
+version: '3.8'
+
+services:
+  py-editor:
+    image: py-editor:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./workspace:/app/workspace
+      - ./snippets:/app/snippets
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+**실행**:
+```bash
+docker-compose up -d
+docker-compose logs -f
+docker-compose down
+```
+
+### 인프라팀 전달 정보
+
+**필수 사항**:
+- **컨테이너 이미지**: `your-registry.com/py-editor:1.0.0`
+- **노출 포트**: `8080` (HTTP)
+- **필수 볼륨**: `/app/workspace` (사용자 파일 저장)
+
+**리소스 권장사항**:
+- **CPU**: 250m (요청) / 500m (제한)
+- **메모리**: 256Mi (요청) / 512Mi (제한)
+- **스토리지**: 10Gi (워크스페이스용)
+
+**환경 변수** (선택):
+- `PORT`: 서버 포트 (기본값: 8080)
+- `DEBUG`: 디버그 모드 (true/false)
+- `NODE_ENV`: 환경 (production/development)
+
+**Health Check**:
+- **Endpoint**: `GET /`
+- **성공 조건**: HTTP 200 OK
+- **초기 지연**: 30초
+- **체크 주기**: 10초
 
 ## 📂 프로젝트 구조
 

@@ -2,13 +2,28 @@ version: '3.8'
 
 services:
   py-editor:
-    build: .
+    image: py-editor:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: py-editor
     ports:
       - "8080:8080"
     volumes:
       - ./workspace:/app/workspace
-      - ./snippets:/app/snippets
     environment:
       - NODE_ENV=production
+      - PORT=8080
     restart: unless-stopped
-    container_name: python-ide
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - py-editor-network
+
+networks:
+  py-editor-network:
+    driver: bridge

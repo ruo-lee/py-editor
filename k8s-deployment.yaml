@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: py-editor
+  labels:
+    app: py-editor
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: py-editor
+  template:
+    metadata:
+      labels:
+        app: py-editor
+        version: v1.0.0
+    spec:
+      containers:
+      - name: py-editor
+        image: your-registry.com/py-editor:1.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: workspace
+          mountPath: /app/workspace
+        env:
+        - name: PORT
+          value: "8080"
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: py-editor-workspace-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: py-editor-service
+  labels:
+    app: py-editor
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: py-editor
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: py-editor-workspace-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
