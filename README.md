@@ -1,129 +1,379 @@
 # Python IDE
 
-경량 웹 기반 Python IDE - 도커 컨테이너로 제공되는 현대적인 코드 에디터
+경량 웹 기반 Python IDE - Docker 컨테이너로 제공되는 VSCode 스타일 코드 에디터
 
-## 주요 기능
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
+![Node.js](https://img.shields.io/badge/node-%3E%3D18-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-- 🐍 **Python 3.11 지원** - 타입 힌팅, 린팅, 문법 검사
-- 📁 **워크스페이스 관리** - 볼륨 마운트를 통한 파일 시스템 접근
-- 🎯 **Go-to-Definition** - Ctrl/Cmd + 클릭으로 모듈 탐색
-- ✂️ **스니펫 지원** - 사용자 정의 Python 코드 템플릿
-- 🏃 **코드 실행** - 내장 Python 인터프리터
-- 🎨 **현대적 UI** - VS Code 스타일의 직관적 인터페이스
+## ✨ 주요 기능
+
+- 🐍 **Python 3.11 완벽 지원** - 최신 Python 문법 및 타입 힌팅
+- ⚡ **실시간 Syntax Checking** - 타이핑하는 동안 오류 표시 (VSCode 스타일)
+- 🔍 **Python Language Server** - 자동완성, 린팅, 타입 체크
+- 🎯 **Go-to-Definition** - Ctrl/Cmd + 클릭으로 모듈/함수 정의로 이동
+- 📂 **파일 관리** - 파일 탐색기, 드래그&드롭, 업로드/다운로드
+- 🖥️ **Split View** - 좌우 분할 에디터로 동시 작업
+- ✂️ **스니펫 지원** - Python 코드 템플릿 (커스터마이징 가능)
+- 🏃 **코드 실행** - 내장 Python 인터프리터로 즉시 실행
+- 🎨 **Monaco Editor** - VS Code와 동일한 편집기 엔진
 - 🔒 **폐쇄망 지원** - 외부 네트워크 연결 불필요
 
-## 빠른 시작
+## 🚀 빠른 시작
 
-### Docker로 실행
+### 필수 요구사항
+
+- **Docker** (컨테이너 실행용)
+- **Node.js 18+** (로컬 개발 시)
+- **모던 웹 브라우저** (Chrome, Firefox, Safari, Edge)
+
+### 방법 1: Docker로 실행 (권장)
 
 ```bash
-# 이미지 빌드
+# 1. 이미지 빌드
 npm run docker:build
 
-# 컨테이너 실행 (워크스페이스 마운트)
+# 2. 컨테이너 실행 (현재 디렉토리의 workspace를 마운트)
 npm run docker:run
 
-# 또는 직접 Docker 명령어
-docker run -p 8080:8080 -v /your/workspace:/app/workspace py-editor
+# 3. 브라우저에서 접속
+open http://localhost:8080
 ```
 
-브라우저에서 `http://localhost:8080` 접속
+**커스텀 워크스페이스 마운트**:
+```bash
+docker run -p 8080:8080 \
+  -v /your/custom/path:/app/workspace \
+  py-editor
+```
 
-### 개발 모드
+**다른 포트 사용**:
+```bash
+docker run -p 3000:8080 \
+  -v $(pwd)/workspace:/app/workspace \
+  py-editor
+# 접속: http://localhost:3000
+```
+
+### 방법 2: 로컬 개발 모드
 
 ```bash
-# 의존성 설치
+# 1. 루트 의존성 설치 (개발 도구)
 npm install
-cd server && npm install
-cd ../client && npm install
 
-# 개발 서버 시작
+# 2. 서버/클라이언트 의존성 설치
+cd server && npm install && cd ..
+cd client && npm install && cd ..
+
+# 또는 한 줄로:
+npm install && (cd server && npm install) && (cd client && npm install)
+
+# 3. 개발 서버 시작 (HMR 지원)
 npm run dev
+
+# 4. 브라우저 자동 오픈
+# - Frontend: http://localhost:5173 (Vite dev server)
+# - Backend: http://localhost:8080 (Express server)
 ```
 
-## 사용법
+## 📖 사용 가이드
 
-### 파일 관리
-- 좌측 Explorer에서 파일/폴더 탐색
-- 파일 클릭으로 에디터에서 열기
-- 자동 저장 (Ctrl/Cmd + S)
+### 1️⃣ 파일 탐색 및 편집
 
-### 코드 작성
-- Monaco Editor 기반 고급 편집 기능
-- Python 문법 강조 및 자동 완성
-- 스니펫: `def`, `class`, `if`, `for` 등 입력 후 Tab
+**파일 열기**:
+- 좌측 Explorer에서 파일 클릭
+- 자동 저장 활성화 (타이핑 시 자동으로 저장)
 
-### 코드 실행
-- Python 파일 열기 후 우상단 "Run" 버튼 클릭
-- 또는 Ctrl/Cmd + R 단축키
-- 하단 패널에서 실행 결과 확인
+**파일 생성**:
+- Explorer에서 폴더 우클릭 → "New File"
+- 또는 "New Folder" 선택
 
-### Go-to-Definition
-- Ctrl/Cmd + 클릭으로 import된 모듈 파일로 이동
-- 워크스페이스 내 Python 파일 간 탐색 지원
+**파일 업로드**:
+- 드래그 앤 드롭으로 파일/폴더 업로드
+- 폴더 구조 유지됨
 
-## 스니펫 커스터마이징
+**파일 다운로드**:
+- 파일/폴더 우클릭 → "Download"
+- 폴더는 ZIP으로 압축되어 다운로드
 
-`/app/snippets/python.json` 파일을 수정하여 사용자 정의 스니펫 추가:
+### 2️⃣ 코드 작성
+
+**실시간 Syntax Checking**:
+- Python 파일 편집 시 500ms 후 자동 검사
+- 오류가 있는 라인에 빨간 밑줄 표시
+- 마우스 오버로 에러 메시지 확인
+
+**자동 완성**:
+- 타이핑 시 자동으로 제안 표시
+- `Tab` 또는 `Enter`로 선택
+
+**스니펫 사용**:
+```python
+# 'def' 입력 후 Tab → 함수 템플릿
+def function_name(param):
+    pass
+
+# 'class' 입력 후 Tab → 클래스 템플릿
+class ClassName:
+    def __init__(self):
+        pass
+
+# 'if' 입력 후 Tab → if 블록
+if condition:
+    pass
+```
+
+### 3️⃣ 코드 실행
+
+**방법 1**: 우상단 "▶ Run" 버튼 클릭
+**방법 2**: `Ctrl/Cmd + R` 단축키
+
+실행 결과는 하단 Output 패널에 표시됩니다.
+
+### 4️⃣ Go-to-Definition
+
+**사용법**:
+1. `import` 문이나 함수 호출에 마우스 오버
+2. `Ctrl` (Windows/Linux) 또는 `Cmd` (Mac) 키 누르기
+3. 밑줄이 생기면 클릭 → 정의로 이동
+
+**지원 범위**:
+- 워크스페이스 내 Python 파일
+- Python 표준 라이브러리 (읽기 전용)
+
+### 5️⃣ Split View
+
+**활성화**:
+- 우상단 분할 아이콘 클릭
+- 또는 탭 우클릭 → "Open to the Side"
+
+**사용**:
+- 좌우 에디터에서 서로 다른 파일 편집
+- 독립적인 탭 관리
+- 드래그로 리사이즈 가능
+
+## 🛠️ 고급 설정
+
+### 스니펫 커스터마이징
+
+`snippets/python.json` 파일 수정:
 
 ```json
 {
-  "my_snippet": {
-    "prefix": "mysnip",
+  "dataclass_template": {
+    "prefix": "dataclass",
     "body": [
-      "def my_function(${1:param}) -> ${2:return_type}:",
-      "    \"\"\"${3:Description}\"\"\"",
-      "    ${4:pass}"
+      "from dataclasses import dataclass",
+      "",
+      "@dataclass",
+      "class ${1:ClassName}:",
+      "    ${2:field}: ${3:type}",
+      "    ${4}"
     ],
-    "description": "My custom snippet"
+    "description": "Python dataclass template"
   }
 }
 ```
 
-## 폴더 구조
+**Docker 컨테이너에 적용**:
+```bash
+docker run -p 8080:8080 \
+  -v $(pwd)/workspace:/app/workspace \
+  -v $(pwd)/custom-snippets.json:/app/snippets/python.json \
+  py-editor
+```
+
+### 워크스페이스 폴더 선택
+
+URL 파라미터로 하위 폴더 선택 가능:
+
+```
+http://localhost:8080/?folder=my_project
+http://localhost:8080/?folder=backend/api
+```
+
+브라우저 UI에서도 폴더 선택 가능합니다.
+
+### 환경 변수
+
+```bash
+docker run -p 8080:8080 \
+  -e PORT=3000 \
+  -e DEBUG=true \
+  -v $(pwd)/workspace:/app/workspace \
+  py-editor
+```
+
+## 📂 프로젝트 구조
 
 ```
 py-editor/
-├── client/              # 프론트엔드 (Vite + Monaco Editor)
-├── server/              # 백엔드 (Express.js)
-├── workspace/           # 사용자 워크스페이스 (마운트 가능)
-├── snippets/            # Python 스니펫 템플릿
-├── Dockerfile          # 컨테이너 설정
-└── package.json        # 프로젝트 설정
+├── client/                 # Frontend (Vite + Monaco Editor)
+│   ├── src/
+│   │   └── utils/
+│   │       └── dragAndDrop.js
+│   ├── main.js            # 메인 앱 로직
+│   ├── index.html
+│   └── package.json
+│
+├── server/                 # Backend (Express.js)
+│   ├── index.js           # 서버 메인
+│   └── package.json
+│
+├── workspace/              # 사용자 작업 공간 (Docker 볼륨 마운트)
+│   └── (your Python files)
+│
+├── snippets/               # Python 스니펫 템플릿
+│   └── python.json
+│
+├── Dockerfile              # Python 3.11 Alpine 기반
+├── .dockerignore           # Docker 빌드 최적화
+├── package.json            # 루트 개발 스크립트
+└── README.md
 ```
 
-## 기술 스택
+## 🔧 기술 스택
 
 ### Frontend
-- **Monaco Editor** - VS Code의 에디터 엔진
-- **Vite** - 빠른 빌드 도구
-- **Vanilla JavaScript** - 경량화를 위한 프레임워크 없는 구현
+- **Monaco Editor** `^0.44.0` - VSCode 에디터 엔진
+- **Vite** `^4.5.0` - 빠른 빌드 도구
+- **Vanilla JavaScript** - 프레임워크 없는 경량 구현
 
 ### Backend
-- **Node.js + Express** - 웹 서버
-- **Python Language Server** - 코드 분석 및 린팅
-- **WebSocket** - 실시간 언어 서버 통신
+- **Express** `^4.18.2` - HTTP 서버
+- **WebSocket (ws)** `^8.14.2` - 실시간 LSP 통신
+- **Python Language Server** - pylsp, mypy, pyflakes
+- **Multer** `^1.4.5` - 파일 업로드
+- **Archiver** `^6.0.1` - ZIP 다운로드
+- **Chokidar** `^3.5.3` - 파일 감지
 
 ### Container
-- **Node.js 18 Alpine** - 경량 베이스 이미지
-- **Python 3.11** - 최신 Python 런타임
+- **Python 3.11 Alpine** - 베이스 이미지
+- **Node.js** - 런타임
+- **pip** - Python 패키지 관리
 
-## 확장 가능성
+## 🐛 문제 해결
 
-현재 구조는 향후 확장을 고려하여 설계되었습니다:
+### Docker 빌드 실패
 
-- **다중 Python 버전 지원** - Docker 이미지 변형으로 구현 가능
-- **추가 언어 지원** - 언어별 서버 및 스니펫 추가
-- **플러그인 시스템** - 모듈식 기능 확장
-- **Git 통합** - 버전 관리 기능
-- **터미널 통합** - 내장 터미널 지원
+```bash
+# 캐시 없이 재빌드
+docker build --no-cache -t py-editor .
 
-## 요구사항
+# 기존 이미지 삭제 후 재빌드
+docker rmi py-editor
+npm run docker:build
+```
 
-- Docker (컨테이너 실행 시)
-- Node.js 18+ (개발 모드)
-- 모던 웹 브라우저 (Chrome, Firefox, Safari, Edge)
+### 포트 충돌 (8080 already in use)
 
-## 라이선스
+```bash
+# 기존 컨테이너 중지
+docker ps | grep py-editor
+docker stop <container-id>
 
-MIT License
+# 또는 다른 포트 사용
+docker run -p 3000:8080 -v $(pwd)/workspace:/app/workspace py-editor
+```
+
+### Language Server 작동 안 함
+
+```bash
+# 컨테이너 재시작
+docker restart <container-id>
+
+# 로그 확인
+docker logs <container-id>
+```
+
+### 파일 권한 문제 (Permission denied)
+
+```bash
+# 워크스페이스 폴더 권한 확인
+chmod -R 755 workspace/
+
+# Docker 볼륨 마운트 시 절대 경로 사용
+docker run -p 8080:8080 -v /absolute/path/to/workspace:/app/workspace py-editor
+```
+
+## 🚧 개발 가이드
+
+### 코드 수정 후 반영
+
+**Frontend 수정**:
+```bash
+cd client
+npm run build
+cd ..
+npm run docker:build  # Docker 이미지 재빌드
+```
+
+**Backend 수정**:
+```bash
+npm run docker:build  # Docker 이미지 재빌드
+```
+
+**개발 모드 (HMR)**:
+```bash
+npm run dev  # 파일 변경 시 자동 reload
+```
+
+### API 엔드포인트
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/files` | 파일 목록 조회 |
+| GET | `/api/files/*` | 파일 내용 읽기 |
+| POST | `/api/files/*` | 파일 생성/수정 |
+| DELETE | `/api/files/*` | 파일/폴더 삭제 |
+| POST | `/api/mkdir` | 디렉토리 생성 |
+| POST | `/api/move` | 파일/폴더 이동 |
+| POST | `/api/upload` | 파일 업로드 |
+| GET | `/api/download/*` | 파일/폴더 다운로드 |
+| POST | `/api/execute` | Python 코드 실행 |
+| POST | `/api/check-syntax` | 실시간 syntax 검사 |
+| GET | `/api/snippets` | 스니펫 목록 |
+| GET | `/api/stdlib/*` | Python 표준 라이브러리 |
+
+### WebSocket (Language Server)
+
+**연결**: `ws://localhost:8080`
+
+**프로토콜**: Language Server Protocol (LSP)
+
+**지원 기능**:
+- `textDocument/completion` - 자동 완성
+- `textDocument/definition` - 정의로 이동
+- `textDocument/hover` - 타입 정보 표시
+
+## 📝 로드맵
+
+- [ ] 다중 Python 버전 지원 (3.8, 3.9, 3.10, 3.12)
+- [ ] 터미널 통합 (xterm.js)
+- [ ] Git 통합 (diff viewer, commit)
+- [ ] 테마 커스터마이징
+- [ ] 다국어 지원
+- [ ] 플러그인 시스템
+- [ ] Jupyter Notebook 지원
+- [ ] 디버거 통합
+
+## 🤝 기여하기
+
+이슈 및 Pull Request 환영합니다!
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 라이선스
+
+MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
+
+## 🙏 감사의 말
+
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Microsoft
+- [Python Language Server](https://github.com/python-lsp/python-lsp-server)
+- [Express.js](https://expressjs.com/)
+- [Vite](https://vitejs.dev/)

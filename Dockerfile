@@ -1,23 +1,21 @@
-FROM node:18-alpine
+FROM python:3.11-alpine
 
-# Install Python and required packages (uses latest available version)
-RUN apk add --no-cache python3 python3-dev py3-pip
+# Install Node.js
+RUN apk add --no-cache nodejs npm
 
 # Create app directory
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 
-# Install dependencies
-RUN npm install
+# Install dependencies (skip root - only needed for local dev)
 RUN cd server && npm install
 RUN cd client && npm install
 
 # Install Python language server
-RUN pip3 install --break-system-packages python-lsp-server[all] pylsp-mypy pyflakes
+RUN pip install python-lsp-server[all] pylsp-mypy pyflakes
 
 # Copy source code
 COPY . .
