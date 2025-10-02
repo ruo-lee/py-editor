@@ -565,11 +565,75 @@ npm run dev  # 파일 변경 시 자동 reload
 
 이슈 및 Pull Request 환영합니다!
 
+### 기여 프로세스
+
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Commit your changes (커밋 메시지 형식 준수)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### 커밋 메시지 형식
+
+이 프로젝트는 [Conventional Commits](https://www.conventionalcommits.org/) 형식을 따릅니다:
+
+```
+<type>(<scope>): <subject>
+```
+
+**타입 (Type)**:
+
+- `feat`: 새로운 기능 추가
+- `fix`: 버그 수정
+- `docs`: 문서 변경
+- `style`: 코드 포맷팅 (기능 변경 없음)
+- `refactor`: 코드 리팩토링
+- `perf`: 성능 개선
+- `test`: 테스트 추가/수정
+- `chore`: 빌드/설정 변경
+- `build`: 빌드 시스템 변경
+- `ci`: CI 설정 변경
+
+**예시**:
+
+```bash
+feat(editor): add real-time syntax checking
+fix(server): handle pylsp not installed error
+docs(readme): add local dev requirements
+chore(deps): update dependencies
+```
+
+**잘못된 형식**:
+
+```bash
+❌ Add syntax checking
+❌ fixed bug
+❌ Update README
+```
+
+**올바른 형식**:
+
+```bash
+✅ feat(editor): add syntax checking
+✅ fix(server): resolve connection issue
+✅ docs(readme): update installation guide
+```
+
+### Pre-commit Hooks
+
+이 프로젝트는 코드 품질을 위해 pre-commit hooks를 사용합니다:
+
+- **ESLint**: 코드 스타일 검사 및 자동 수정
+- **Prettier**: 코드 포맷팅
+- **Commit Message 검증**: Conventional Commits 형식 확인
+
+커밋이 실패하면 형식을 수정하거나, 긴급한 경우 `--no-verify` 옵션을 사용할 수 있습니다:
+
+```bash
+git commit --no-verify -m "your message"
+```
+
+자세한 기여 가이드는 [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
 
 ## 📄 라이선스
 
