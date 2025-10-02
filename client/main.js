@@ -24,6 +24,7 @@ class PythonIDE {
         this.currentLinkDecorations = [];
         this.rightCurrentLinkDecorations = []; // For right editor
         this.selectedDirectory = ''; // Currently selected directory for context menu operations
+        this.selectedItem = null; // Currently selected file/directory item {path, type}
         this.contextMenuTarget = null; // Target element for context menu
 
         // Parse workspace folder from URL
@@ -1200,6 +1201,7 @@ class PythonIDE {
 
                     element.classList.add('selected');
                     this.selectedDirectory = item.path;
+                    this.selectedItem = { path: item.path, type: 'directory' };
                 });
 
                 // Right-click context menu
@@ -1224,7 +1226,16 @@ class PythonIDE {
                     <span>${item.name}</span>
                 `;
 
-                element.addEventListener('click', () => {
+                element.addEventListener('click', (e) => {
+                    e.stopPropagation();
+
+                    // Clear previous selections
+                    document.querySelectorAll('.file-item.selected').forEach((el) => {
+                        el.classList.remove('selected');
+                    });
+
+                    element.classList.add('selected');
+                    this.selectedItem = { path: item.path, type: 'file' };
                     this.openFile(item.path);
                 });
 
@@ -2053,6 +2064,25 @@ class PythonIDE {
                 this.executeCode();
             }
 
+            // Delete selected file/directory
+            // Support: Delete (Windows/Linux), Backspace (macOS), Cmd+Backspace (macOS), Cmd+Delete (macOS)
+            const isDeleteKey =
+                e.key === 'Delete' || (e.key === 'Backspace' && (e.metaKey || e.ctrlKey));
+
+            if (isDeleteKey && this.selectedItem) {
+                // Only delete if focus is not in an input field or editor
+                const activeElement = document.activeElement;
+                const isInEditor =
+                    activeElement?.classList.contains('monaco-editor') ||
+                    activeElement?.tagName === 'TEXTAREA' ||
+                    activeElement?.tagName === 'INPUT';
+
+                if (!isInEditor) {
+                    e.preventDefault();
+                    this.deleteItem(this.selectedItem.path, this.selectedItem.type);
+                }
+            }
+
             // Close dialogs with Escape
             if (e.key === 'Escape') {
                 this.closeDialog();
@@ -2084,6 +2114,7 @@ class PythonIDE {
                     el.classList.remove('selected');
                 });
                 this.selectedDirectory = '';
+                this.selectedItem = null;
             }
         });
     }
