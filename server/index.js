@@ -44,7 +44,12 @@ const logger = {
 const upload = multer({ dest: '/tmp/uploads/' });
 
 // Path validation and base path utilities
-const WORKSPACE_ROOT = '/app/workspace';
+// Support both Docker (/app/workspace) and local dev (../workspace)
+const WORKSPACE_ROOT =
+    process.env.WORKSPACE_ROOT ||
+    (fsSync.existsSync('/app/workspace')
+        ? '/app/workspace'
+        : path.join(__dirname, '..', 'workspace'));
 
 function validateAndResolvePath(requestedPath) {
     // Normalize the path and resolve it
@@ -510,16 +515,48 @@ wss.on('connection', (ws) => {
 
             if (data.method === 'initialize') {
                 // Start Python Language Server with proper configuration
-                pylsp = spawn('pylsp', ['-v'], {
-                    stdio: ['pipe', 'pipe', 'pipe'],
-                    cwd: '/app/workspace',
-                    env: {
-                        ...process.env,
-                        PYTHONPATH:
-                            '/app/workspace:/usr/local/lib/python3.11:/usr/local/lib/python3.11/site-packages',
-                        PYTHONHOME: '/usr/local',
-                    },
-                });
+                try {
+                    pylsp = spawn('pylsp', ['-v'], {
+                        stdio: ['pipe', 'pipe', 'pipe'],
+                        cwd: WORKSPACE_ROOT,
+                        env: {
+                            ...process.env,
+                            PYTHONPATH:
+                                WORKSPACE_ROOT +
+                                ':/usr/local/lib/python3.11:/usr/local/lib/python3.11/site-packages',
+                            PYTHONHOME: '/usr/local',
+                        },
+                    });
+
+                    pylsp.on('error', (error) => {
+                        logger.error('Failed to start pylsp', { error: error.message });
+                        // Send error response to client
+                        ws.send(
+                            JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: data.id,
+                                error: {
+                                    code: -32099,
+                                    message:
+                                        'Python Language Server not available. Install pylsp with: pip install python-lsp-server',
+                                },
+                            })
+                        );
+                    });
+                } catch (error) {
+                    logger.error('Failed to spawn pylsp', { error: error.message });
+                    ws.send(
+                        JSON.stringify({
+                            jsonrpc: '2.0',
+                            id: data.id,
+                            error: {
+                                code: -32099,
+                                message: 'Python Language Server not available',
+                            },
+                        })
+                    );
+                    return;
+                }
 
                 pylsp.stdout.on('data', (chunk) => {
                     try {

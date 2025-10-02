@@ -41,6 +41,7 @@ open http://localhost:8080
 ```
 
 **커스텀 워크스페이스 마운트**:
+
 ```bash
 docker run -p 8080:8080 \
   -v /your/custom/path:/app/workspace \
@@ -48,6 +49,7 @@ docker run -p 8080:8080 \
 ```
 
 **다른 포트 사용**:
+
 ```bash
 docker run -p 3000:8080 \
   -v $(pwd)/workspace:/app/workspace \
@@ -56,6 +58,12 @@ docker run -p 3000:8080 \
 ```
 
 ### 방법 2: 로컬 개발 모드
+
+**로컬 개발 환경 요구사항:**
+
+- Node.js 18+
+- Python 3.11+
+- Python Language Server (선택사항, 자동완성/go-to-definition 기능): `pip install python-lsp-server[all]`
 
 ```bash
 # 1. 루트 의존성 설치 (개발 도구)
@@ -71,43 +79,52 @@ npm install && (cd server && npm install) && (cd client && npm install)
 # 3. 개발 서버 시작 (HMR 지원)
 npm run dev
 
-# 4. 브라우저 자동 오픈
-# - Frontend: http://localhost:5173 (Vite dev server)
-# - Backend: http://localhost:8080 (Express server)
+# 4. 브라우저 접속
+# - Frontend: http://localhost:3000 (Vite dev server with proxy)
+# - Backend API: http://localhost:8080 (Express server)
 ```
+
+> **참고**: `pylsp`가 설치되지 않아도 기본 편집/실행 기능은 정상 작동합니다.
 
 ## 📖 사용 가이드
 
 ### 1️⃣ 파일 탐색 및 편집
 
 **파일 열기**:
+
 - 좌측 Explorer에서 파일 클릭
 - 자동 저장 활성화 (타이핑 시 자동으로 저장)
 
 **파일 생성**:
+
 - Explorer에서 폴더 우클릭 → "New File"
 - 또는 "New Folder" 선택
 
 **파일 업로드**:
+
 - 드래그 앤 드롭으로 파일/폴더 업로드
 - 폴더 구조 유지됨
 
 **파일 다운로드**:
+
 - 파일/폴더 우클릭 → "Download"
 - 폴더는 ZIP으로 압축되어 다운로드
 
 ### 2️⃣ 코드 작성
 
 **실시간 Syntax Checking**:
+
 - Python 파일 편집 시 500ms 후 자동 검사
 - 오류가 있는 라인에 빨간 밑줄 표시
 - 마우스 오버로 에러 메시지 확인
 
 **자동 완성**:
+
 - 타이핑 시 자동으로 제안 표시
 - `Tab` 또는 `Enter`로 선택
 
 **스니펫 사용**:
+
 ```python
 # 'def' 입력 후 Tab → 함수 템플릿
 def function_name(param):
@@ -133,21 +150,25 @@ if condition:
 ### 4️⃣ Go-to-Definition
 
 **사용법**:
+
 1. `import` 문이나 함수 호출에 마우스 오버
 2. `Ctrl` (Windows/Linux) 또는 `Cmd` (Mac) 키 누르기
 3. 밑줄이 생기면 클릭 → 정의로 이동
 
 **지원 범위**:
+
 - 워크스페이스 내 Python 파일
 - Python 표준 라이브러리 (읽기 전용)
 
 ### 5️⃣ Split View
 
 **활성화**:
+
 - 우상단 분할 아이콘 클릭
 - 또는 탭 우클릭 → "Open to the Side"
 
 **사용**:
+
 - 좌우 에디터에서 서로 다른 파일 편집
 - 독립적인 탭 관리
 - 드래그로 리사이즈 가능
@@ -165,18 +186,18 @@ if condition:
 
 ```json
 {
-  "dataclass_template": {
-    "prefix": "dataclass",
-    "body": [
-      "from dataclasses import dataclass",
-      "",
-      "@dataclass",
-      "class ${1:ClassName}:",
-      "    ${2:field}: ${3:type}",
-      "    ${4}"
-    ],
-    "description": "Python dataclass template"
-  }
+    "dataclass_template": {
+        "prefix": "dataclass",
+        "body": [
+            "from dataclasses import dataclass",
+            "",
+            "@dataclass",
+            "class ${1:ClassName}:",
+            "    ${2:field}: ${3:type}",
+            "    ${4}"
+        ],
+        "description": "Python dataclass template"
+    }
 }
 ```
 
@@ -224,84 +245,86 @@ docker push your-registry.com/py-editor:latest
 ### Kubernetes 배포
 
 **deployment.yaml**:
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: py-editor
-  labels:
-    app: py-editor
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: py-editor
-  template:
-    metadata:
-      labels:
+    name: py-editor
+    labels:
         app: py-editor
-    spec:
-      containers:
-      - name: py-editor
-        image: your-registry.com/py-editor:1.0.0
-        ports:
-        - containerPort: 8080
-          name: http
-        volumeMounts:
-        - name: workspace
-          mountPath: /app/workspace
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-      volumes:
-      - name: workspace
-        persistentVolumeClaim:
-          claimName: py-editor-workspace-pvc
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: py-editor
+    template:
+        metadata:
+            labels:
+                app: py-editor
+        spec:
+            containers:
+                - name: py-editor
+                  image: your-registry.com/py-editor:1.0.0
+                  ports:
+                      - containerPort: 8080
+                        name: http
+                  volumeMounts:
+                      - name: workspace
+                        mountPath: /app/workspace
+                  resources:
+                      requests:
+                          memory: '256Mi'
+                          cpu: '250m'
+                      limits:
+                          memory: '512Mi'
+                          cpu: '500m'
+                  livenessProbe:
+                      httpGet:
+                          path: /
+                          port: 8080
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                  readinessProbe:
+                      httpGet:
+                          path: /
+                          port: 8080
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+            volumes:
+                - name: workspace
+                  persistentVolumeClaim:
+                      claimName: py-editor-workspace-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: py-editor-service
+    name: py-editor-service
 spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-    targetPort: 8080
-    protocol: TCP
-    name: http
-  selector:
-    app: py-editor
+    type: LoadBalancer
+    ports:
+        - port: 80
+          targetPort: 8080
+          protocol: TCP
+          name: http
+    selector:
+        app: py-editor
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: py-editor-workspace-pvc
+    name: py-editor-workspace-pvc
 spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: standard
+    accessModes:
+        - ReadWriteMany
+    resources:
+        requests:
+            storage: 10Gi
+    storageClassName: standard
 ```
 
 **배포 명령어**:
+
 ```bash
 kubectl apply -f deployment.yaml
 
@@ -316,33 +339,35 @@ kubectl logs -f deployment/py-editor
 ### Docker Compose
 
 **docker-compose.yml**:
+
 ```yaml
 version: '3.8'
 
 services:
-  py-editor:
-    image: py-editor:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./workspace:/app/workspace
-      - ./snippets:/app/snippets
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    py-editor:
+        image: py-editor:latest
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - '8080:8080'
+        volumes:
+            - ./workspace:/app/workspace
+            - ./snippets:/app/snippets
+        environment:
+            - NODE_ENV=production
+            - PORT=8080
+        restart: unless-stopped
+        healthcheck:
+            test: ['CMD', 'curl', '-f', 'http://localhost:8080']
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
 ```
 
 **실행**:
+
 ```bash
 docker-compose up -d
 docker-compose logs -f
@@ -352,21 +377,25 @@ docker-compose down
 ### 인프라팀 전달 정보
 
 **필수 사항**:
+
 - **컨테이너 이미지**: `your-registry.com/py-editor:1.0.0`
 - **노출 포트**: `8080` (HTTP)
 - **필수 볼륨**: `/app/workspace` (사용자 파일 저장)
 
 **리소스 권장사항**:
+
 - **CPU**: 250m (요청) / 500m (제한)
 - **메모리**: 256Mi (요청) / 512Mi (제한)
 - **스토리지**: 10Gi (워크스페이스용)
 
 **환경 변수** (선택):
+
 - `PORT`: 서버 포트 (기본값: 8080)
 - `DEBUG`: 디버그 모드 (true/false)
 - `NODE_ENV`: 환경 (production/development)
 
 **Health Check**:
+
 - **Endpoint**: `GET /`
 - **성공 조건**: HTTP 200 OK
 - **초기 지연**: 30초
@@ -403,11 +432,13 @@ py-editor/
 ## 🔧 기술 스택
 
 ### Frontend
+
 - **Monaco Editor** `^0.44.0` - VSCode 에디터 엔진
 - **Vite** `^4.5.0` - 빠른 빌드 도구
 - **Vanilla JavaScript** - 프레임워크 없는 경량 구현
 
 ### Backend
+
 - **Express** `^4.18.2` - HTTP 서버
 - **WebSocket (ws)** `^8.14.2` - 실시간 LSP 통신
 - **Python Language Server** - pylsp, mypy, pyflakes
@@ -416,6 +447,7 @@ py-editor/
 - **Chokidar** `^3.5.3` - 파일 감지
 
 ### Container
+
 - **Python 3.11 Alpine** - 베이스 이미지
 - **Node.js** - 런타임
 - **pip** - Python 패키지 관리
@@ -469,6 +501,7 @@ docker run -p 8080:8080 -v /absolute/path/to/workspace:/app/workspace py-editor
 ### 코드 수정 후 반영
 
 **Frontend 수정**:
+
 ```bash
 cd client
 npm run build
@@ -477,31 +510,33 @@ npm run docker:build  # Docker 이미지 재빌드
 ```
 
 **Backend 수정**:
+
 ```bash
 npm run docker:build  # Docker 이미지 재빌드
 ```
 
 **개발 모드 (HMR)**:
+
 ```bash
 npm run dev  # 파일 변경 시 자동 reload
 ```
 
 ### API 엔드포인트
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/files` | 파일 목록 조회 |
-| GET | `/api/files/*` | 파일 내용 읽기 |
-| POST | `/api/files/*` | 파일 생성/수정 |
-| DELETE | `/api/files/*` | 파일/폴더 삭제 |
-| POST | `/api/mkdir` | 디렉토리 생성 |
-| POST | `/api/move` | 파일/폴더 이동 |
-| POST | `/api/upload` | 파일 업로드 |
-| GET | `/api/download/*` | 파일/폴더 다운로드 |
-| POST | `/api/execute` | Python 코드 실행 |
-| POST | `/api/check-syntax` | 실시간 syntax 검사 |
-| GET | `/api/snippets` | 스니펫 목록 |
-| GET | `/api/stdlib/*` | Python 표준 라이브러리 |
+| Method | Path                | Description            |
+| ------ | ------------------- | ---------------------- |
+| GET    | `/api/files`        | 파일 목록 조회         |
+| GET    | `/api/files/*`      | 파일 내용 읽기         |
+| POST   | `/api/files/*`      | 파일 생성/수정         |
+| DELETE | `/api/files/*`      | 파일/폴더 삭제         |
+| POST   | `/api/mkdir`        | 디렉토리 생성          |
+| POST   | `/api/move`         | 파일/폴더 이동         |
+| POST   | `/api/upload`       | 파일 업로드            |
+| GET    | `/api/download/*`   | 파일/폴더 다운로드     |
+| POST   | `/api/execute`      | Python 코드 실행       |
+| POST   | `/api/check-syntax` | 실시간 syntax 검사     |
+| GET    | `/api/snippets`     | 스니펫 목록            |
+| GET    | `/api/stdlib/*`     | Python 표준 라이브러리 |
 
 ### WebSocket (Language Server)
 
@@ -510,6 +545,7 @@ npm run dev  # 파일 변경 시 자동 reload
 **프로토콜**: Language Server Protocol (LSP)
 
 **지원 기능**:
+
 - `textDocument/completion` - 자동 완성
 - `textDocument/definition` - 정의로 이동
 - `textDocument/hover` - 타입 정보 표시
