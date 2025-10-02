@@ -79,8 +79,39 @@ class PythonIDE {
         // Python language configuration
         monaco.languages.register({ id: 'python' });
 
+        const welcomeMessage = `"""
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║     ██████╗ ██╗   ██╗       ███████╗██████╗ ██╗████████╗ ██████╗ ██████╗
+║     ██╔══██╗╚██╗ ██╔╝       ██╔════╝██╔══██╗██║╚══██╔══╝██╔═══██╗██╔══██╗
+║     ██████╔╝ ╚████╔╝  ████╗ █████╗  ██║  ██║██║   ██║   ██║   ██║██████╔╝
+║     ██╔═══╝   ╚██╔╝   ╚═══╝ ██╔══╝  ██║  ██║██║   ██║   ██║   ██║██╔══██╗
+║     ██║        ██║          ███████╗██████╔╝██║   ██║   ╚██████╔╝██║  ██║
+║     ╚═╝        ╚═╝          ╚══════╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
+║                                                                           ║
+║         Welcome to PY-EDITOR - Python Development Environment            ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+🚀 Quick Start:
+   • Create a new file: Click the + icon in Explorer
+   • Open existing file: Click any .py file in Explorer
+   • Run your code: Click the Run button or press Ctrl+R (Cmd+R on Mac)
+   • Save your work: Press Ctrl+S (Cmd+S on Mac)
+
+💡 Tips:
+   • Use split view: Click the split icon to edit multiple files
+   • Delete files: Select a file and press Delete (Cmd+Backspace on Mac)
+   • Switch themes: Click the theme toggle button in the top-right corner
+   • Auto-completion: Start typing to see intelligent suggestions
+
+📝 Start coding by opening a file from the Explorer!
+
+Note: This is a read-only welcome screen. Open or create a file to start editing.
+"""`;
+
         this.editor = monaco.editor.create(document.getElementById('editor'), {
-            value: '# Welcome to Python IDE\\n# Create or open a Python file to get started\\n',
+            value: welcomeMessage,
             language: 'python',
             theme: this.currentTheme,
             fontSize: 14,
@@ -97,6 +128,7 @@ class PythonIDE {
             autoIndent: 'full',
             formatOnPaste: true,
             formatOnType: true,
+            readOnly: true, // Welcome screen is read-only
             bracketPairColorization: {
                 enabled: true,
             },
