@@ -30,6 +30,7 @@
             border-bottom: 1px solid #2b2b2b;
             display: flex;
             align-items: center;
+            justify-content: space-between;
             padding: 0 15px;
             font-weight: 400;
         }
@@ -39,6 +40,163 @@
             color: #cccccc;
             letter-spacing: 0.5px;
             font-weight: 400;
+        }
+
+        .theme-toggle-btn {
+            background: transparent;
+            border: none;
+            color: #cccccc;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        /* Light Theme */
+        body.light-theme {
+            background: #ffffff;
+            color: #333333;
+        }
+
+        body.light-theme .header {
+            background: #f3f3f3;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        body.light-theme .app-title {
+            color: #333333;
+        }
+
+        body.light-theme .theme-toggle-btn {
+            color: #333333;
+        }
+
+        body.light-theme .theme-toggle-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: #000000;
+        }
+
+        body.light-theme .sidebar {
+            background: #f8f8f8;
+            border-right: 1px solid #e5e5e5;
+        }
+
+        body.light-theme .sidebar-header {
+            background: #f3f3f3;
+            color: #333333;
+        }
+
+        body.light-theme .explorer-header {
+            background: #f8f8f8;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        body.light-theme .explorer-title {
+            color: #333333;
+        }
+
+        body.light-theme .action-button {
+            color: #616161;
+        }
+
+        body.light-theme .action-button:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: #000000;
+        }
+
+        body.light-theme .file-item {
+            color: #333333;
+        }
+
+        body.light-theme .file-item:hover {
+            background: #e8e8e8;
+        }
+
+        body.light-theme .file-item.selected {
+            background: #e0e0e0;
+        }
+
+        body.light-theme .file-item.active {
+            background: #d0d0d0;
+        }
+
+        body.light-theme .tab-bar {
+            background: #f3f3f3;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        body.light-theme .tab {
+            background: #f3f3f3;
+            border-right: 1px solid #e5e5e5;
+            color: #333333;
+        }
+
+        body.light-theme .tab.active {
+            background: #ffffff;
+            border-bottom: 2px solid #007acc;
+        }
+
+        body.light-theme .tab:hover {
+            background: #e8e8e8;
+        }
+
+        body.light-theme .file-path-bar {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e5e5;
+            color: #333333;
+        }
+
+        body.light-theme .output-panel {
+            background: #ffffff;
+            border-top: 1px solid #e5e5e5;
+            color: #333333;
+        }
+
+        body.light-theme .execute-button {
+            background: #007acc;
+        }
+
+        body.light-theme .execute-button:hover {
+            background: #005a9e;
+        }
+
+        body.light-theme .split-divider {
+            background: #e5e5e5;
+        }
+
+        body.light-theme .split-divider:hover {
+            background: #007acc;
+        }
+
+        body.light-theme .context-menu {
+            background: #ffffff;
+            border: 1px solid #cccccc;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        body.light-theme .context-menu-item {
+            color: #333333;
+        }
+
+        body.light-theme .context-menu-item:hover {
+            background: #e8e8e8;
+        }
+
+        body.light-theme .context-menu-item.destructive {
+            color: #d32f2f;
+        }
+
+        body.light-theme .context-menu-separator {
+            background: #e5e5e5;
         }
 
         .main-content {
@@ -632,6 +790,9 @@
     <div id="app">
         <div class="header">
             <span class="app-title">PyEditor</span>
+            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
+                <i class="codicon codicon-color-mode"></i>
+            </button>
         </div>
         <div class="main-content">
             <div class="sidebar" id="sidebar">
