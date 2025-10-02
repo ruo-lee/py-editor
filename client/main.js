@@ -1565,9 +1565,27 @@ class PythonIDE {
             return `<i class="codicon codicon-${glyph}" style="color: ${iconColor}; font-size: 16px;"></i>`;
         };
 
+        // Python logo SVG icon
+        const pythonIcon = () => {
+            return `<svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align: middle;">
+                <defs>
+                    <linearGradient id="pyBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#387eb8;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#366994;stop-opacity:1" />
+                    </linearGradient>
+                    <linearGradient id="pyYellow" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#ffe873;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#ffd43b;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <path fill="url(#pyBlue)" d="M7.5 1C5.5 1 5 2 5 2.5V4h2.5v.3H3.8C3 4.3 2 5 2 7s.8 2.7 1.8 2.7H5V8.3c0-.8.7-1.5 1.5-1.5h4c.7 0 1.3-.6 1.3-1.3v-3C11.8 1.7 10.5 1 7.5 1zm-1 1.5c.3 0 .5.2.5.5s-.2.5-.5.5-.5-.2-.5-.5.2-.5.5-.5z"/>
+                <path fill="url(#pyYellow)" d="M8.5 15c2 0 2.5-1 2.5-1.5V12H8.5v-.3h3.7c.8 0 1.8-.7 1.8-2.7s-.8-2.7-1.8-2.7H11v1.4c0 .8-.7 1.5-1.5 1.5h-4c-.7 0-1.3.6-1.3 1.3v3c0 .8 1.3 1.5 4.3 1.5zm1-1.5c-.3 0-.5-.2-.5-.5s.2-.5.5-.5.5.2.5.5-.2.5-.5.5z"/>
+            </svg>`;
+        };
+
         switch (ext) {
             case 'py':
-                return icon('symbol-method', '#4b8bbe');
+                return pythonIcon();
             case 'js':
                 return icon('symbol-method', '#f0db4f');
             case 'jsx':
