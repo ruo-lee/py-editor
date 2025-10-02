@@ -39,6 +39,10 @@ class PythonIDE {
         this.syncInProgress = false; // Prevents infinite sync loops
         this.modelChangeListeners = new Map(); // Stores change listeners for cleanup
 
+        // Theme state
+        this.currentTheme = localStorage.getItem('editor-theme') || 'vs-dark';
+        this.applyTheme(this.currentTheme);
+
         this.initializeEditor();
         this.initializeLanguageServer();
         this.loadSnippets();
@@ -77,7 +81,7 @@ class PythonIDE {
         this.editor = monaco.editor.create(document.getElementById('editor'), {
             value: '# Welcome to Python IDE\\n# Create or open a Python file to get started\\n',
             language: 'python',
-            theme: 'vs-dark',
+            theme: this.currentTheme,
             fontSize: 14,
             lineNumbers: 'on',
             minimap: { enabled: false },
@@ -1984,6 +1988,14 @@ class PythonIDE {
             this.executeCode('left');
         });
 
+        // Theme toggle button
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                this.toggleTheme();
+            });
+        }
+
         // Split toggle button
         const splitToggleBtn = document.getElementById('splitToggleBtn');
         if (splitToggleBtn) {
@@ -2801,7 +2813,7 @@ class PythonIDE {
         this.rightEditor = monaco.editor.create(document.getElementById('editor2'), {
             value: '# Click here and open a file to edit',
             language: 'python',
-            theme: 'vs-dark',
+            theme: this.currentTheme,
             fontSize: 14,
             lineNumbers: 'on',
             minimap: { enabled: false },
@@ -3359,6 +3371,31 @@ class PythonIDE {
         msg.textContent = 'Download started';
         document.body.appendChild(msg);
         setTimeout(() => msg.remove(), 2000);
+    }
+
+    toggleTheme() {
+        this.currentTheme = this.currentTheme === 'vs-dark' ? 'vs' : 'vs-dark';
+        this.applyTheme(this.currentTheme);
+        localStorage.setItem('editor-theme', this.currentTheme);
+    }
+
+    applyTheme(theme) {
+        // Update body class
+        if (theme === 'vs') {
+            document.body.classList.add('light-theme');
+        } else {
+            document.body.classList.remove('light-theme');
+        }
+
+        // Update main editor
+        if (this.editor) {
+            monaco.editor.setTheme(theme);
+        }
+
+        // Update right editor if exists
+        if (this.rightEditor) {
+            monaco.editor.setTheme(theme);
+        }
     }
 }
 
