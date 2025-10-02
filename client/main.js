@@ -2341,42 +2341,48 @@ class PythonIDE {
 
     setupSplitResize(divider, leftGroup, rightGroup) {
         let isDragging = false;
-        let startX = 0;
-        let startLeftWidth = 0;
-        let startRightWidth = 0;
 
-        divider.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.clientX;
-            startLeftWidth = leftGroup.offsetWidth;
-            startRightWidth = rightGroup.offsetWidth;
-            document.body.style.cursor = 'col-resize';
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
+        const onMouseMove = (e) => {
             if (!isDragging) return;
 
-            const delta = e.clientX - startX;
-            const newLeftWidth = startLeftWidth + delta;
-            const newRightWidth = startRightWidth - delta;
-            const totalWidth = startLeftWidth + startRightWidth;
+            const editorArea = document.getElementById('editorArea');
+            const containerRect = editorArea.getBoundingClientRect();
+            const mouseX = e.clientX - containerRect.left;
+            const totalWidth = containerRect.width;
 
-            if (newLeftWidth > 200 && newRightWidth > 200) {
-                const leftPercent = (newLeftWidth / totalWidth) * 100;
-                const rightPercent = (newRightWidth / totalWidth) * 100;
+            // Calculate percentage based on mouse position
+            let leftPercent = (mouseX / totalWidth) * 100;
 
-                leftGroup.style.flex = `0 0 ${leftPercent}%`;
-                rightGroup.style.flex = `0 0 ${rightPercent}%`;
-            }
-        });
+            // Enforce minimum widths (200px minimum for each side)
+            const minWidthPercent = (200 / totalWidth) * 100;
+            if (leftPercent < minWidthPercent) leftPercent = minWidthPercent;
+            if (leftPercent > 100 - minWidthPercent) leftPercent = 100 - minWidthPercent;
 
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                document.body.style.cursor = '';
-            }
-        });
+            const rightPercent = 100 - leftPercent;
+
+            leftGroup.style.flex = `0 0 ${leftPercent}%`;
+            rightGroup.style.flex = `0 0 ${rightPercent}%`;
+
+            e.preventDefault();
+        };
+
+        const onMouseUp = () => {
+            isDragging = false;
+            document.body.style.cursor = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        const onMouseDown = (e) => {
+            isDragging = true;
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
+
+        divider.addEventListener('mousedown', onMouseDown);
     }
 
     async openFileInSplit(filepath) {

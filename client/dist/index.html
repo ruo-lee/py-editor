@@ -132,10 +132,18 @@
             background: #2d2d30;
             cursor: col-resize;
             position: relative;
+            z-index: 10;
+            flex-shrink: 0;
+            user-select: none;
         }
 
         .split-divider:hover {
             background: #007acc;
+        }
+
+        .split-divider:active {
+            background: #1e90ff;
+            cursor: col-resize;
         }
 
         .tab-bar {
@@ -619,7 +627,7 @@
         }
 
     </style>
-  <script type="module" crossorigin src="/assets/index-8906b92b.js"></script>
+  <script type="module" crossorigin src="/assets/index-9087571a.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/monaco-editor-46131bbd.js">
   <link rel="stylesheet" href="/assets/monaco-editor-39af074f.css">
 </head>

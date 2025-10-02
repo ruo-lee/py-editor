@@ -132,10 +132,18 @@
             background: #2d2d30;
             cursor: col-resize;
             position: relative;
+            z-index: 10;
+            flex-shrink: 0;
+            user-select: none;
         }
 
         .split-divider:hover {
             background: #007acc;
+        }
+
+        .split-divider:active {
+            background: #1e90ff;
+            cursor: col-resize;
         }
 
         .tab-bar {
