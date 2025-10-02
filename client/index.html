@@ -174,12 +174,13 @@
             color: #333333;
         }
 
-        body.light-theme .execute-button {
-            background: #007acc;
+        body.light-theme .execute-btn {
+            color: #424242;
         }
 
-        body.light-theme .execute-button:hover {
-            background: #005a9e;
+        body.light-theme .execute-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: #000000;
         }
 
         body.light-theme .split-divider {
@@ -335,11 +336,19 @@
             position: relative;
         }
 
-        .split-toggle-btn {
+        .tab-bar-actions {
             position: absolute;
             right: 8px;
             top: 50%;
             transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .execute-btn,
+        .split-toggle-btn {
             background: transparent;
             border: none;
             color: #cccccc;
@@ -351,12 +360,17 @@
             align-items: center;
             justify-content: center;
             transition: all 0.1s ease;
-            z-index: 10;
         }
 
+        .execute-btn:hover,
         .split-toggle-btn:hover {
             background: rgba(255, 255, 255, 0.1);
             color: #ffffff;
+        }
+
+        .execute-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .tab {
@@ -578,23 +592,6 @@
             padding: 10px;
         }
 
-        .execute-button {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #0e639c;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            z-index: 1000;
-        }
-
-        .execute-button:hover {
-            background: #1177bb;
-        }
 
         .output-panel {
             height: 200px;
@@ -840,14 +837,18 @@
             <div class="editor-area" id="editorArea">
                 <div class="editor-group" id="editorGroup1">
                     <div class="tab-bar" id="tabBar">
-                        <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor">
-                            <i class="codicon codicon-split-horizontal"></i>
-                        </button>
+                        <div class="tab-bar-actions">
+                            <button class="execute-btn" id="executeButton" title="Run Code (Ctrl+R)" style="display: none;">
+                                <i class="codicon codicon-play"></i>
+                            </button>
+                            <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor">
+                                <i class="codicon codicon-split-horizontal"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="file-path-bar" id="filePathBar"></div>
                     <div class="editor-container">
                         <div id="editor"></div>
-                        <button class="execute-button" id="executeButton" style="display: none;">Run</button>
                     </div>
                     <div class="output-panel" id="outputPanel" style="display: none;"></div>
                 </div>

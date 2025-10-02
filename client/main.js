@@ -2876,11 +2876,16 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         rightGroup.className = 'editor-group';
         rightGroup.id = 'editorGroup2';
         rightGroup.innerHTML = `
-            <div class="tab-bar" id="tabBar2"></div>
+            <div class="tab-bar" id="tabBar2">
+                <div class="tab-bar-actions">
+                    <button class="execute-btn" id="executeButton2" title="Run Code (Ctrl+R)" style="display: none;">
+                        <i class="codicon codicon-play"></i>
+                    </button>
+                </div>
+            </div>
             <div class="file-path-bar" id="filePathBar2"></div>
             <div class="editor-container">
                 <div id="editor2"></div>
-                <button class="execute-button" id="executeButton2" style="display: none;">Run</button>
             </div>
             <div class="output-panel" id="outputPanel2" style="display: none;"></div>
         `;
