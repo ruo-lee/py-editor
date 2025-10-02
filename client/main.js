@@ -169,11 +169,17 @@ class PythonIDE {
                 // Notify language server of changes
                 const content = this.editor.getValue();
                 this.notifyDocumentChanged(this.activeFile, content);
+
+                // Real-time syntax checking (debounced)
+                this.debouncedSyntaxCheck();
             }
         });
 
         // Setup code completion
         this.setupCodeCompletion();
+
+        // Initialize syntax checking debounce
+        this.syntaxCheckTimeout = null;
     }
 
     setupCodeCompletion() {
@@ -388,6 +394,69 @@ class PythonIDE {
                 }];
             }
         });
+    }
+
+    // Debounced syntax checking (500ms delay)
+    debouncedSyntaxCheck() {
+        if (this.syntaxCheckTimeout) {
+            clearTimeout(this.syntaxCheckTimeout);
+        }
+
+        this.syntaxCheckTimeout = setTimeout(() => {
+            this.performSyntaxCheck();
+        }, 500);
+    }
+
+    // Perform real-time syntax checking
+    async performSyntaxCheck() {
+        if (!this.activeFile || !this.activeFile.endsWith('.py')) {
+            return;
+        }
+
+        try {
+            const code = this.editor.getValue();
+            const model = this.editor.getModel();
+
+            if (!model) return;
+
+            const response = await fetch(this.buildUrl('/api/check-syntax'), {
+                method: 'POST',
+                headers: this.getFetchHeaders(),
+                body: JSON.stringify({
+                    code: code,
+                    filename: this.activeFile
+                })
+            });
+
+            const result = await response.json();
+
+            // Clear existing markers
+            monaco.editor.setModelMarkers(model, 'python-syntax', []);
+
+            // Add new markers if there are errors
+            if (result.status === 'error' && result.errors) {
+                const markers = result.errors.map(error => {
+                    // Get line content to determine end column
+                    const lineContent = model.getLineContent(error.line);
+                    const endColumn = error.endColumn || (error.column + Math.min(lineContent.length - error.column + 1, 20));
+
+                    return {
+                        severity: error.severity === 'error'
+                            ? monaco.MarkerSeverity.Error
+                            : monaco.MarkerSeverity.Warning,
+                        startLineNumber: error.line,
+                        startColumn: error.column,
+                        endLineNumber: error.endLine || error.line,
+                        endColumn: endColumn,
+                        message: `${error.type}: ${error.message}`
+                    };
+                });
+
+                monaco.editor.setModelMarkers(model, 'python-syntax', markers);
+            }
+        } catch (error) {
+            console.error('Syntax check failed:', error);
+        }
     }
 
     async getCompletionItems(model, position) {

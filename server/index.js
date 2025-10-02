@@ -317,6 +317,101 @@ app.get('/api/stdlib/*', async (req, res) => {
   }
 });
 
+// Python syntax checking (real-time)
+app.post('/api/check-syntax', async (req, res) => {
+  try {
+    const { code, filename } = req.body;
+    const tempFile = path.join('/tmp', filename || 'syntax_check.py');
+
+    await fs.writeFile(tempFile, code);
+
+    // Use Python's ast module for accurate syntax checking
+    const python = spawn('python3', ['-c', `
+import sys
+import ast
+import json
+
+try:
+    with open('${tempFile}', 'r', encoding='utf-8') as f:
+        source_code = f.read()
+
+    # Try to parse with ast for better error reporting
+    ast.parse(source_code, filename='${tempFile}')
+    print('{"status": "ok"}')
+
+except SyntaxError as e:
+    # Get accurate line and column information
+    line = e.lineno if e.lineno else 1
+    column = e.offset if e.offset else 1
+
+    error_data = {
+        "status": "error",
+        "errors": [{
+            "severity": "error",
+            "line": line,
+            "column": column,
+            "endLine": line,
+            "endColumn": column + 10,
+            "message": str(e.msg),
+            "type": "SyntaxError"
+        }]
+    }
+    print(json.dumps(error_data))
+
+except Exception as e:
+    error_data = {
+        "status": "error",
+        "errors": [{
+            "severity": "error",
+            "line": 1,
+            "column": 1,
+            "endLine": 1,
+            "endColumn": 10,
+            "message": str(e),
+            "type": type(e).__name__
+        }]
+    }
+    print(json.dumps(error_data))
+`]);
+
+    let output = '';
+    let error = '';
+
+    python.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    python.stderr.on('data', (data) => {
+      error += data.toString();
+    });
+
+    python.on('close', async (code) => {
+      try {
+        // Clean up temp file
+        await fs.unlink(tempFile).catch(() => {});
+        await fs.unlink(tempFile + 'c').catch(() => {}); // .pyc file
+
+        // Parse output
+        const result = JSON.parse(output.trim());
+        res.json(result);
+      } catch (parseError) {
+        res.json({
+          status: 'error',
+          errors: [{
+            severity: 'error',
+            line: 1,
+            column: 1,
+            message: error || 'Unknown syntax error',
+            type: 'ParseError'
+          }]
+        });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Python execution
 app.post('/api/execute', async (req, res) => {
   try {
