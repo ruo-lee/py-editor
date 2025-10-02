@@ -1976,6 +1976,10 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         const openTabs = editorGroup === 'left' ? this.openTabs : this.rightOpenTabs;
         const outputPanel =
             editorGroup === 'left' ? this.outputPanel : document.getElementById('outputPanel2');
+        const outputPanelContent =
+            editorGroup === 'left'
+                ? document.getElementById('outputPanelContent')
+                : document.getElementById('outputPanelContent2');
 
         if (!activeFile || !activeFile.endsWith('.py')) return;
 
@@ -1986,10 +1990,10 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         const filename = activeFile.split('/').pop();
 
         try {
-            if (outputPanel) {
+            if (outputPanel && outputPanelContent) {
                 outputPanel.style.display = 'block';
-                outputPanel.className = 'output-panel';
-                outputPanel.textContent = 'Executing...';
+                outputPanelContent.className = 'output-panel-content';
+                outputPanelContent.textContent = 'Executing...';
             }
 
             const response = await fetch('/api/execute', {
@@ -2002,19 +2006,19 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
 
             const result = await response.json();
 
-            if (outputPanel) {
+            if (outputPanelContent) {
                 if (result.success) {
-                    outputPanel.textContent =
+                    outputPanelContent.textContent =
                         result.output || 'Code executed successfully (no output)';
                 } else {
-                    outputPanel.className = 'output-panel error';
-                    outputPanel.textContent = result.error || 'Execution failed';
+                    outputPanelContent.className = 'output-panel-content error';
+                    outputPanelContent.textContent = result.error || 'Execution failed';
                 }
             }
         } catch (error) {
-            if (outputPanel) {
-                outputPanel.className = 'output-panel error';
-                outputPanel.textContent = 'Failed to execute code: ' + error.message;
+            if (outputPanelContent) {
+                outputPanelContent.className = 'output-panel-content error';
+                outputPanelContent.textContent = 'Failed to execute code: ' + error.message;
             }
         }
     }
@@ -2081,6 +2085,20 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         document.getElementById('refreshBtn').addEventListener('click', () => {
             this.loadFileExplorer();
         });
+
+        // Output panel close button (left editor)
+        const outputPanelClose = document.getElementById('outputPanelClose');
+        if (outputPanelClose) {
+            outputPanelClose.addEventListener('click', () => {
+                this.outputPanel.style.display = 'none';
+            });
+        }
+
+        // Output panel resizer (left editor)
+        const outputPanelResizer = document.getElementById('outputPanelResizer');
+        if (outputPanelResizer) {
+            this.setupOutputPanelResize(outputPanelResizer, this.outputPanel);
+        }
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -2476,6 +2494,49 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         };
 
         divider.addEventListener('mousedown', onMouseDown);
+    }
+
+    setupOutputPanelResize(resizer, outputPanel) {
+        let isDragging = false;
+        let startY = 0;
+        let startHeight = 0;
+
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+
+            const deltaY = startY - e.clientY;
+            const newHeight = startHeight + deltaY;
+
+            // Enforce minimum and maximum heights
+            const minHeight = 100;
+            const maxHeight = window.innerHeight - 300;
+
+            if (newHeight >= minHeight && newHeight <= maxHeight) {
+                outputPanel.style.height = `${newHeight}px`;
+            }
+
+            e.preventDefault();
+        };
+
+        const onMouseUp = () => {
+            isDragging = false;
+            document.body.style.cursor = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        const onMouseDown = (e) => {
+            isDragging = true;
+            startY = e.clientY;
+            startHeight = outputPanel.offsetHeight;
+            document.body.style.cursor = 'ns-resize';
+            e.preventDefault();
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
+
+        resizer.addEventListener('mousedown', onMouseDown);
     }
 
     async openFileInSplit(filepath) {
@@ -2887,7 +2948,16 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
             <div class="editor-container">
                 <div id="editor2"></div>
             </div>
-            <div class="output-panel" id="outputPanel2" style="display: none;"></div>
+            <div class="output-panel" id="outputPanel2" style="display: none;">
+                <div class="output-panel-resizer" id="outputPanelResizer2"></div>
+                <div class="output-panel-header">
+                    <div class="output-panel-title">Output</div>
+                    <button class="output-panel-close" id="outputPanelClose2" title="Close Output">
+                        <i class="codicon codicon-close"></i>
+                    </button>
+                </div>
+                <div class="output-panel-content" id="outputPanelContent2"></div>
+            </div>
         `;
 
         // Add to DOM
@@ -2953,6 +3023,24 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
             executeButton2.addEventListener('click', () => {
                 this.executeCode('right');
             });
+        }
+
+        // Output panel close button (right editor)
+        const outputPanelClose2 = document.getElementById('outputPanelClose2');
+        if (outputPanelClose2) {
+            outputPanelClose2.addEventListener('click', () => {
+                const outputPanel2 = document.getElementById('outputPanel2');
+                if (outputPanel2) {
+                    outputPanel2.style.display = 'none';
+                }
+            });
+        }
+
+        // Output panel resizer (right editor)
+        const outputPanelResizer2 = document.getElementById('outputPanelResizer2');
+        const outputPanel2 = document.getElementById('outputPanel2');
+        if (outputPanelResizer2 && outputPanel2) {
+            this.setupOutputPanelResize(outputPanelResizer2, outputPanel2);
         }
 
         // Setup editor focus tracking

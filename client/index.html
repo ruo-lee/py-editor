@@ -171,7 +171,40 @@
         body.light-theme .output-panel {
             background: #ffffff;
             border-top: 1px solid #e5e5e5;
+        }
+
+        body.light-theme .output-panel-resizer {
+            background: #e5e5e5;
+        }
+
+        body.light-theme .output-panel-resizer:hover {
+            background: #007acc;
+        }
+
+        body.light-theme .output-panel-header {
+            background: #f3f3f3;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        body.light-theme .output-panel-title {
             color: #333333;
+        }
+
+        body.light-theme .output-panel-close {
+            color: #424242;
+        }
+
+        body.light-theme .output-panel-close:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: #000000;
+        }
+
+        body.light-theme .output-panel-content {
+            color: #333333;
+        }
+
+        body.light-theme .output-panel-content.error {
+            color: #d32f2f;
         }
 
         body.light-theme .execute-btn {
@@ -597,15 +630,73 @@
             height: 200px;
             background: #1e1e1e;
             border-top: 1px solid #3e3e42;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .output-panel-resizer {
+            height: 4px;
+            background: #2d2d30;
+            cursor: ns-resize;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .output-panel-resizer:hover {
+            background: #007acc;
+        }
+
+        .output-panel-header {
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 30px;
+            flex-shrink: 0;
+        }
+
+        .output-panel-title {
+            color: #cccccc;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .output-panel-close {
+            background: transparent;
+            border: none;
+            color: #cccccc;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .output-panel-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .output-panel-content {
             font-family: 'Courier New', monospace;
             font-size: 12px;
             padding: 10px;
             overflow-y: auto;
             white-space: pre-wrap;
-            flex-shrink: 0;
+            flex: 1;
+            color: #cccccc;
         }
 
-        .output-panel.error {
+        .output-panel-content.error {
             color: #f14c4c;
         }
 
@@ -850,7 +941,16 @@
                     <div class="editor-container">
                         <div id="editor"></div>
                     </div>
-                    <div class="output-panel" id="outputPanel" style="display: none;"></div>
+                    <div class="output-panel" id="outputPanel" style="display: none;">
+                        <div class="output-panel-resizer" id="outputPanelResizer"></div>
+                        <div class="output-panel-header">
+                            <div class="output-panel-title">Output</div>
+                            <button class="output-panel-close" id="outputPanelClose" title="Close Output">
+                                <i class="codicon codicon-close"></i>
+                            </button>
+                        </div>
+                        <div class="output-panel-content" id="outputPanelContent"></div>
+                    </div>
                 </div>
             </div>
         </div>
