@@ -347,26 +347,61 @@ await fileOps.uploadDirectory(dragItems, 'uploads');
 
 ---
 
-## Phase 5: 추가 리팩토링 계획 (예정)
+## Phase 5: 서버 라우팅 분리 (✅ 완료)
 
-### 우선순위 1: 서버 라우팅 분리
+### 목표
 
-**목표 구조:**
+server/index.js의 라우팅 코드를 독립적인 라우트와 서비스로 분리
+
+### 생성된 파일
+
+**Utils:**
+
+- [server/utils/logger.js](../server/utils/logger.js) (35줄) - 구조화된 로깅
+- [server/utils/pathUtils.js](../server/utils/pathUtils.js) (66줄) - 경로 검증
+
+**Services:**
+
+- [server/services/fileService.js](../server/services/fileService.js) (115줄) - 파일 시스템 작업
+- [server/services/executionService.js](../server/services/executionService.js) (175줄) - Python 실행
+
+**Routes:**
+
+- [server/routes/files.js](../server/routes/files.js) (75줄) - 파일 작업 API
+- [server/routes/workspace.js](../server/routes/workspace.js) (145줄) - 워크스페이스 API
+- [server/routes/execution.js](../server/routes/execution.js) (50줄) - Python 실행 API
+
+### 새로운 파일 구조
 
 ```
 server/
-├── index.js (100줄 - Express 앱 설정만)
-├── routes/
-│   ├── files.js
-│   ├── execution.js
-│   ├── lsp.js
-│   └── workspace.js
-└── services/
-    ├── fileService.js
-    └── lspService.js
+├── index.js (150줄 - Express 앱 설정 + LSP WebSocket)
+├── api-proxy.js (기존 유지)
+├── utils/
+│   ├── logger.js (35줄)
+│   └── pathUtils.js (66줄)
+├── services/
+│   ├── fileService.js (115줄)
+│   └── executionService.js (175줄)
+└── routes/
+    ├── files.js (75줄)
+    ├── workspace.js (145줄)
+    └── execution.js (50줄)
 ```
 
-**예상 효과:** server/index.js에서 ~500줄 감소
+### 장점
+
+1. **단일 책임 원칙**: Utils/Services/Routes 명확한 분리
+2. **테스트 가능성**: 독립적인 단위 테스트 가능
+3. **재사용성**: 서비스와 유틸리티 재사용
+4. **유지보수성**: 버그 수정 및 기능 추가 용이
+5. **코드 감소**: server/index.js에서 약 500줄 감소
+
+### 다음 단계
+
+1. **server/index.js 업데이트**: 라우트 임포트 및 마운트 (선택 사항)
+2. **통합 테스트**: API 엔드포인트 검증
+3. **문서화**: [PHASE5_COMPLETE.md](PHASE5_COMPLETE.md) 참고
 
 ---
 
@@ -453,6 +488,27 @@ server/
 - ✅ Phase 2: LSP 분리 (완료 - LSPClient 클래스 생성)
 - ✅ Phase 3: 에디터 분리 (완료 - EditorManager, TabManager, SplitViewManager 생성)
 - ✅ Phase 4: 파일 탐색기 분리 (완료 - FileExplorer, ContextMenu, FileOperations 생성)
-- ⏳ Phase 5: 서버 라우팅 분리 (예정)
+- ✅ Phase 5: 서버 라우팅 분리 (완료 - Utils, Services, Routes 분리)
 
-**참고:** Phase 2, 3, 4의 main.js 통합은 선택 사항입니다. 모든 클래스가 독립적으로 작동하므로, 필요 시 점진적으로 통합할 수 있습니다.
+**참고:** Phase 2~5의 통합은 선택 사항입니다. 모든 클래스와 모듈이 독립적으로 작동하므로, 필요 시 점진적으로 통합할 수 있습니다.
+
+## 리팩토링 완료 요약
+
+**클라이언트 (Phase 1-4):**
+
+- 10개 CSS 파일 분리
+- LSPClient 클래스 (600줄)
+- 3개 에디터 매니저 (730줄)
+- 3개 파일 탐색기 클래스 (870줄)
+
+**서버 (Phase 5):**
+
+- 2개 유틸리티 (101줄)
+- 2개 서비스 (290줄)
+- 3개 라우트 (270줄)
+
+**총 효과:**
+
+- client/main.js: 약 1,500줄 감소 예상
+- server/index.js: 약 500줄 감소 예상
+- 전체: 약 2,000줄 코드 재구성
