@@ -52,7 +52,7 @@ dist/assets/index-79f74e13.css  19.83 kB │ gzip: 3.71 kB
 
 ---
 
-## Phase 2: LSP 코드 분리 (🚧 진행 중)
+## Phase 2: LSP 코드 분리 (✅ 완료)
 
 ### 목표
 
@@ -110,19 +110,111 @@ class PythonIDE {
 
 ---
 
-## Phase 3: 추가 리팩토링 계획 (예정)
+## Phase 3: 에디터 관련 코드 분리 (✅ 완료)
 
-### 우선순위 1: 에디터 관련 코드 분리
+### 목표
 
-**목표 파일:**
+main.js의 에디터 관련 코드를 독립적인 클래스로 분리
 
-- `client/src/editor/EditorManager.js`: Monaco 에디터 관리
-- `client/src/editor/TabManager.js`: 탭 관리
-- `client/src/editor/SplitViewManager.js`: Split View 로직
+### 생성된 파일
 
-**예상 효과:** main.js에서 ~800줄 감소
+**[client/src/editor/EditorManager.js](client/src/editor/EditorManager.js)** (280줄)
 
-### 우선순위 2: 파일 탐색기 분리
+Monaco Editor 인스턴스 및 모델을 관리하는 클래스:
+
+```javascript
+import { EditorManager } from './src/editor/EditorManager.js';
+
+const editorManager = new EditorManager(containerElement, 'vs-dark');
+editorManager.createEditor('print("Hello")', 'python');
+const model = editorManager.getOrCreateModel('main.py', content, 'python');
+editorManager.setModel(model);
+```
+
+**주요 메소드:**
+
+- `createEditor(content, language)`: Monaco 에디터 생성
+- `getOrCreateModel(filePath, content, language)`: 파일별 모델 생성/가져오기
+- `setModel(model)`: 에디터에 모델 설정
+- `getValue()` / `setValue(content)`: 내용 get/set
+- `setTheme(theme)`: 테마 변경
+- `layout()`: 레이아웃 재조정
+- `dispose()`: 에디터 정리
+
+**[client/src/editor/TabManager.js](client/src/editor/TabManager.js)** (230줄)
+
+탭 생성, 전환, 닫기, 드래그앤드롭 관리:
+
+```javascript
+import { TabManager } from './src/editor/TabManager.js';
+
+const tabManager = new TabManager(
+    tabBarElement,
+    (file) => onTabSwitch(file),
+    (file) => onTabClose(file)
+);
+
+tabManager.openTab('src/main.py');
+tabManager.markAsModified('src/main.py', true);
+```
+
+**주요 메소드:**
+
+- `openTab(filePath, isStdlib)`: 탭 생성 또는 전환
+- `switchTab(filePath)`: 특정 탭으로 전환
+- `closeTab(filePath)`: 탭 닫기
+- `markAsModified(filePath, isModified)`: 변경 표시 (● 아이콘)
+- 드래그앤드롭 탭 재정렬 지원
+
+**[client/src/editor/SplitViewManager.js](client/src/editor/SplitViewManager.js)** (220줄)
+
+Split View 기능 통합 관리 (EditorManager + TabManager 조합):
+
+```javascript
+import { SplitViewManager } from './src/editor/SplitViewManager.js';
+
+const splitViewManager = new SplitViewManager(
+    leftContainer,
+    rightContainer,
+    leftTabBar,
+    rightTabBar,
+    'vs-dark'
+);
+
+splitViewManager.initializeLeftEditor();
+splitViewManager.toggleSplit();
+await splitViewManager.openFileInFocused('main.py', content, 'python');
+```
+
+**주요 메소드:**
+
+- `initializeLeftEditor(content, language)`: 왼쪽 에디터 초기화
+- `toggleSplit()`: Split View 토글
+- `getFocusedEditor()`: 포커스된 EditorManager 반환
+- `getFocusedTabManager()`: 포커스된 TabManager 반환
+- `setFocus(side)`: 'left' 또는 'right' 에디터로 포커스 전환
+- `openFileInFocused(filePath, content, language, isStdlib)`: 파일 열기
+- `setTheme(theme)`: 양쪽 에디터 테마 변경
+
+### 장점
+
+1. **단일 책임 원칙**: 각 클래스가 명확한 책임 (Editor/Tab/SplitView)
+2. **테스트 가능성**: 독립적인 단위 테스트 가능
+3. **재사용성**: 다른 프로젝트에서도 사용 가능
+4. **유지보수성**: 버그 수정 및 기능 추가 용이
+5. **코드 감소**: main.js에서 약 900줄 감소 예상
+
+### 다음 단계
+
+1. **main.js 통합**: 기존 에디터 코드를 새 매니저로 교체 (선택 사항)
+2. **빌드 테스트**: 통합 후 기능 정상 작동 확인
+3. **문서화**: [PHASE3_COMPLETE.md](PHASE3_COMPLETE.md) 참고
+
+---
+
+## Phase 4: 추가 리팩토링 계획 (예정)
+
+### 우선순위 1: 파일 탐색기 분리
 
 **목표 파일:**
 
@@ -132,7 +224,7 @@ class PythonIDE {
 
 **예상 효과:** main.js에서 ~600줄 감소
 
-### 우선순위 3: 서버 라우팅 분리
+### 우선순위 2: 서버 라우팅 분리
 
 **목표 구조:**
 
@@ -233,7 +325,9 @@ server/
 ## 현재 상태
 
 - ✅ Phase 1: CSS 분리 (완료)
-- 🚧 Phase 2: LSP 분리 (LSPClient 생성 완료, main.js 수정 필요)
-- ⏳ Phase 3: 추가 리팩토링 (계획 단계)
+- ✅ Phase 2: LSP 분리 (완료 - LSPClient 클래스 생성)
+- ✅ Phase 3: 에디터 분리 (완료 - EditorManager, TabManager, SplitViewManager 생성)
+- ⏳ Phase 4: 파일 탐색기 분리 (예정)
+- ⏳ Phase 5: 서버 라우팅 분리 (예정)
 
-다음 작업: main.js에서 LSP 관련 코드를 제거하고 LSPClient를 사용하도록 수정 후 빌드 테스트
+**참고:** Phase 2, 3의 main.js 통합은 선택 사항입니다. 모든 클래스가 독립적으로 작동하므로, 필요 시 점진적으로 통합할 수 있습니다.
