@@ -255,6 +255,22 @@
             color: #000000;
         }
 
+        body.light-theme .workspace-header {
+            background: #e8e8e8;
+        }
+
+        body.light-theme .workspace-header:hover {
+            background: #d8d8d8;
+        }
+
+        body.light-theme .workspace-title {
+            color: #333333;
+        }
+
+        body.light-theme .workspace-toggle {
+            color: #424242;
+        }
+
         .main-content {
             flex: 1;
             display: flex;
@@ -513,15 +529,15 @@
         .file-item {
             display: flex;
             align-items: center;
-            padding: 3px 8px;
+            padding: 2px 8px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             white-space: nowrap;
             color: #cccccc;
             transition: background-color 0.1s ease;
             border-radius: 3px;
             margin: 1px 4px;
-            min-height: 22px;
+            min-height: 20px;
             box-sizing: border-box;
         }
 
@@ -726,6 +742,50 @@
             gap: 2px;
         }
 
+        .workspace-header {
+            background: #37373d;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .workspace-header:hover {
+            background: #2a2d2e;
+        }
+
+        .workspace-toggle {
+            color: #cccccc;
+            font-size: 14px;
+            transition: transform 0.1s ease;
+            flex-shrink: 0;
+        }
+
+        .workspace-toggle.expanded {
+            transform: rotate(90deg);
+        }
+
+        .workspace-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #cccccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .workspace-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .workspace-content.expanded {
+            max-height: 100vh;
+        }
+
         .action-button {
             background: none;
             border: none;
@@ -908,6 +968,12 @@
             <div class="sidebar" id="sidebar">
                 <div class="explorer-header">
                     <div class="explorer-title">Explorer</div>
+                </div>
+                <div class="workspace-header" id="workspaceHeader">
+                    <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+                        <i class="codicon codicon-chevron-right workspace-toggle" id="workspaceToggle"></i>
+                        <span class="workspace-title" id="workspaceTitle">PY-EDITOR</span>
+                    </div>
                     <div class="explorer-actions">
                         <button class="action-button" id="newFileBtn" title="New File">
                             <i class="codicon codicon-new-file"></i>
@@ -918,10 +984,15 @@
                         <button class="action-button" id="refreshBtn" title="Refresh">
                             <i class="codicon codicon-refresh"></i>
                         </button>
+                        <button class="action-button" id="collapseAllBtn" title="Collapse All">
+                            <i class="codicon codicon-collapse-all"></i>
+                        </button>
                     </div>
                 </div>
-                <div class="file-explorer" id="fileExplorer">
-                    <div class="loading">Loading files...</div>
+                <div class="workspace-content" id="workspaceContent">
+                    <div class="file-explorer" id="fileExplorer">
+                        <div class="loading">Loading files...</div>
+                    </div>
                 </div>
                 <div class="sidebar-resizer" id="sidebarResizer"></div>
             </div>

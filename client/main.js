@@ -50,6 +50,7 @@ class PythonIDE {
         this.loadFileExplorer();
         this.setupEventListeners();
         this.initializeSidebarResize();
+        this.initializeWorkspaceSection();
     }
 
     // Helper method to add workspace folder to requests
@@ -2070,20 +2071,28 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         }
 
         // Explorer actions
-        document.getElementById('newFileBtn').addEventListener('click', () => {
+        document.getElementById('newFileBtn').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent workspace header from toggling
             // Clear selection when using toolbar button (create in root)
             this.selectedDirectory = '';
             this.showCreateDialog('file');
         });
 
-        document.getElementById('newFolderBtn').addEventListener('click', () => {
+        document.getElementById('newFolderBtn').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent workspace header from toggling
             // Clear selection when using toolbar button (create in root)
             this.selectedDirectory = '';
             this.showCreateDialog('folder');
         });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
+        document.getElementById('refreshBtn').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent workspace header from toggling
             this.loadFileExplorer();
+        });
+
+        document.getElementById('collapseAllBtn').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent workspace header from toggling
+            this.collapseAllFolders();
         });
 
         // Output panel close button (left editor)
@@ -3570,6 +3579,48 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         if (this.rightEditor) {
             monaco.editor.setTheme(theme);
         }
+    }
+
+    collapseAllFolders() {
+        // Find all expanded folders in file explorer (not workspace header)
+        const expandedFolders = document.querySelectorAll(
+            '.file-explorer .folder-content.expanded'
+        );
+        const expandedToggles = document.querySelectorAll('.file-explorer .folder-toggle.expanded');
+
+        // Collapse all folders (workspace header remains open)
+        expandedFolders.forEach((folder) => {
+            folder.classList.remove('expanded');
+        });
+
+        expandedToggles.forEach((toggle) => {
+            toggle.classList.remove('expanded');
+        });
+    }
+
+    initializeWorkspaceSection() {
+        const workspaceHeader = document.getElementById('workspaceHeader');
+        const workspaceToggle = document.getElementById('workspaceToggle');
+        const workspaceContent = document.getElementById('workspaceContent');
+        const workspaceTitle = document.getElementById('workspaceTitle');
+
+        // Set workspace title to directory name only
+        const title = this.workspaceFolder || 'workspace';
+        workspaceTitle.textContent = title.toUpperCase();
+
+        // Load saved state or default to expanded
+        const isExpanded = localStorage.getItem('workspace-expanded') !== 'false';
+        if (isExpanded) {
+            workspaceToggle.classList.add('expanded');
+            workspaceContent.classList.add('expanded');
+        }
+
+        // Toggle workspace section
+        workspaceHeader.addEventListener('click', () => {
+            const expanded = workspaceToggle.classList.toggle('expanded');
+            workspaceContent.classList.toggle('expanded');
+            localStorage.setItem('workspace-expanded', expanded);
+        });
     }
 }
 
