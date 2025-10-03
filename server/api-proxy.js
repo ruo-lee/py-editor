@@ -110,6 +110,8 @@ async function proxyRequest(options) {
             // Send body if present
             if (body && ['POST', 'PUT', 'PATCH'].includes(method)) {
                 const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+                console.log('[API Proxy] Sending body:', bodyString);
+                console.log('[API Proxy] Body type:', typeof body);
                 req.write(bodyString);
             }
 
