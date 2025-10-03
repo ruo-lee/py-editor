@@ -212,19 +212,144 @@ await splitViewManager.openFileInFocused('main.py', content, 'python');
 
 ---
 
-## Phase 4: 추가 리팩토링 계획 (예정)
+## Phase 4: 파일 탐색기 분리 (✅ 완료)
 
-### 우선순위 1: 파일 탐색기 분리
+### 목표
 
-**목표 파일:**
+main.js의 파일 탐색기 관련 코드를 독립적인 클래스로 분리
 
-- `client/src/explorer/FileExplorer.js`: 파일 탐색기 UI
-- `client/src/explorer/ContextMenu.js`: 우클릭 메뉴
-- `client/src/explorer/FileOperations.js`: 파일 CRUD
+### 생성된 파일
 
-**예상 효과:** main.js에서 ~600줄 감소
+**[client/src/explorer/FileExplorer.js](client/src/explorer/FileExplorer.js)** (380줄)
 
-### 우선순위 2: 서버 라우팅 분리
+파일 트리 렌더링 및 상호작용 관리:
+
+```javascript
+import { FileExplorer } from './src/explorer/FileExplorer.js';
+
+const fileExplorer = new FileExplorer(containerElement, {
+    showHiddenFiles: false,
+    getFileIcon: (fileName) => '📄',
+    onFileClick: (filePath) => openFile(filePath),
+    onFolderClick: (folderPath) => selectFolder(folderPath),
+    onContextMenu: (event, filePath, type) => showMenu(event, filePath, type),
+    onFileMove: (draggedItem, targetDir) => moveFile(draggedItem, targetDir),
+    onExternalFileDrop: (items, targetDir, type) => uploadFiles(items, targetDir),
+});
+
+fileExplorer.render(files);
+```
+
+**주요 메소드:**
+
+- `render(files, container, level)`: 파일 트리 렌더링
+- `renderDirectory()` / `renderFile()`: 디렉토리/파일 아이템 렌더링
+- `clearSelection()`: 선택 해제
+- `getSelectedDirectory()` / `getSelectedItem()`: 선택 상태 조회
+- `toggleHiddenFiles()`: 숨김 파일 표시 토글
+- `expandFolder(path)` / `collapseFolder(path)`: 폴더 확장/축소
+- 드래그앤드롭 지원 (내부 이동 + 외부 파일 업로드)
+
+**[client/src/explorer/ContextMenu.js](client/src/explorer/ContextMenu.js)** (160줄)
+
+우클릭 컨텍스트 메뉴 관리:
+
+```javascript
+import { ContextMenu } from './src/explorer/ContextMenu.js';
+
+const contextMenu = new ContextMenu();
+
+contextMenu.show(event, filePath, type, {
+    open: () => openFile(filePath),
+    createFile: () => createFile(filePath),
+    createFolder: () => createFolder(filePath),
+    rename: () => rename(filePath),
+    duplicate: () => duplicate(filePath),
+    download: () => download(filePath),
+    copyPath: () => copy(filePath),
+    copyRelativePath: () => copy(`./${filePath}`),
+    delete: () => deleteItem(filePath),
+});
+```
+
+**주요 메소드:**
+
+- `show(event, filePath, type, actions)`: 파일/디렉토리 메뉴 표시
+- `showEmptySpaceMenu(event, actions)`: 빈 공간 메뉴 표시
+- `close()`: 메뉴 닫기
+- `isOpen()`: 메뉴 열림 여부
+
+**[client/src/explorer/FileOperations.js](client/src/explorer/FileOperations.js)** (330줄)
+
+파일/디렉토리 CRUD 작업 API 관리:
+
+```javascript
+import { FileOperations } from './src/explorer/FileOperations.js';
+
+const fileOps = new FileOperations(''); // API base URL
+
+// 파일 탐색기 로드
+const files = await fileOps.loadFileExplorer();
+
+// 파일/디렉토리 생성
+await fileOps.createFile('new_file.py', 'src');
+await fileOps.createDirectory('new_folder', 'src');
+
+// 파일 읽기/저장
+const content = await fileOps.readFile('main.py');
+await fileOps.saveFile('main.py', 'print("Hello")');
+
+// 이름 변경/복제/이동
+await fileOps.renameItem('old.py', 'new.py');
+await fileOps.duplicateItem('file.py', 'file');
+await fileOps.moveItem('file.py', 'target_folder');
+
+// 삭제/다운로드
+await fileOps.deleteItem('file.py', 'file');
+await fileOps.downloadItem('file.py');
+
+// 업로드
+await fileOps.uploadFiles(fileList, 'uploads');
+await fileOps.uploadDirectory(dragItems, 'uploads');
+```
+
+**주요 메소드:**
+
+- `loadFileExplorer()`: 파일 구조 로드
+- `createFile()` / `createDirectory()`: 생성
+- `readFile()` / `saveFile()`: 읽기/저장
+- `deleteItem()`: 삭제
+- `renameItem()` / `duplicateItem()` / `moveItem()`: 편집
+- `downloadItem()`: 다운로드
+- `uploadFiles()` / `uploadDirectory()`: 업로드
+- `copyToClipboard()`: 클립보드 복사
+
+### 장점
+
+1. **단일 책임 원칙**: 각 클래스가 명확한 책임
+    - FileExplorer: UI 렌더링 및 상호작용
+    - ContextMenu: 메뉴 관리
+    - FileOperations: API 통신
+
+2. **테스트 가능성**: 독립적인 단위 테스트 가능
+
+3. **재사용성**: 다른 프로젝트에서도 사용 가능
+
+4. **유지보수성**: 버그 수정 및 기능 추가 용이
+
+5. **코드 감소**: main.js에서 약 600줄 감소 예상
+
+### 다음 단계
+
+1. **main.js 통합**: 기존 파일 탐색기 코드를 새 클래스로 교체 (선택 사항)
+2. **빌드 테스트**: 통합 후 기능 정상 작동 확인
+3. **문서화**: [PHASE4_COMPLETE.md](PHASE4_COMPLETE.md) 참고
+
+---
+
+## Phase 5: 추가 리팩토링 계획 (예정)
+
+### 우선순위 1: 서버 라우팅 분리
 
 **목표 구조:**
 
@@ -327,7 +452,7 @@ server/
 - ✅ Phase 1: CSS 분리 (완료)
 - ✅ Phase 2: LSP 분리 (완료 - LSPClient 클래스 생성)
 - ✅ Phase 3: 에디터 분리 (완료 - EditorManager, TabManager, SplitViewManager 생성)
-- ⏳ Phase 4: 파일 탐색기 분리 (예정)
+- ✅ Phase 4: 파일 탐색기 분리 (완료 - FileExplorer, ContextMenu, FileOperations 생성)
 - ⏳ Phase 5: 서버 라우팅 분리 (예정)
 
-**참고:** Phase 2, 3의 main.js 통합은 선택 사항입니다. 모든 클래스가 독립적으로 작동하므로, 필요 시 점진적으로 통합할 수 있습니다.
+**참고:** Phase 2, 3, 4의 main.js 통합은 선택 사항입니다. 모든 클래스가 독립적으로 작동하므로, 필요 시 점진적으로 통합할 수 있습니다.
