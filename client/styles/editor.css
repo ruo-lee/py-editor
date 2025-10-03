@@ -1,0 +1,103 @@
+/* Editor area and Monaco editor styles */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    min-width: 0;
+}
+
+.editor-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+}
+
+.editor-group.split {
+    border-right: 1px solid #3e3e42;
+}
+
+.split-divider {
+    width: 4px;
+    background: #2d2d30;
+    cursor: col-resize;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.split-divider:hover {
+    background: #007acc;
+}
+
+.split-divider:active {
+    background: #1e90ff;
+    cursor: col-resize;
+}
+
+.editor-container {
+    flex: 1;
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+#editor, #editor2 {
+    height: 100%;
+    width: 100%;
+    flex: 1;
+}
+
+.file-path-bar {
+    height: 24px;
+    background: #1e1e1e;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 11px;
+    color: #cccccc;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-path-bar.stdlib {
+    background: #2d2d2d;
+    color: #888888;
+    font-style: italic;
+}
+
+/* Monaco editor enhancements */
+.highlight-definition {
+    background-color: rgba(255, 255, 0, 0.2);
+    border: 1px solid rgba(255, 255, 0, 0.4);
+}
+
+/* Ctrl+hover link styling */
+.ctrl-hover-link {
+    color: #4FC3F7 !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+}
+
+.monaco-editor .view-line .ctrl-hover-link {
+    color: #4FC3F7 !important;
+    text-decoration: underline !important;
+}
+
+.monaco-editor.ctrl-key-pressed {
+    cursor: pointer !important;
+}
+
+.monaco-editor .view-line span:hover {
+    transition: color 0.1s ease-in-out;
+}
+
+.monaco-editor .decorationsOverviewRuler {
+    z-index: 1;
+}

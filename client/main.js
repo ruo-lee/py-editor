@@ -2,6 +2,18 @@ import * as monaco from 'monaco-editor';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import { ApiPanel } from './api-panel.js';
 
+// Import CSS styles
+import './styles/base.css';
+import './styles/header.css';
+import './styles/sidebar.css';
+import './styles/editor.css';
+import './styles/tabs.css';
+import './styles/output.css';
+import './styles/api-panel.css';
+import './styles/components/dialogs.css';
+import './styles/components/context-menu.css';
+import './styles/themes/light.css';
+
 // Configure Monaco Editor environment
 self.MonacoEnvironment = {
     getWorker() {

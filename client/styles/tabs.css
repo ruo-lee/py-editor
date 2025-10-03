@@ -1,0 +1,115 @@
+/* Tab bar and tab styles */
+.tab-bar {
+    height: 35px;
+    background: #2d2d30;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.tab-bar-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    z-index: 10;
+}
+
+.execute-btn,
+.split-toggle-btn {
+    background: transparent;
+    border: none;
+    color: #cccccc;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+}
+
+.execute-btn:hover,
+.split-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.execute-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tab {
+    height: 35px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #2d2d30;
+    border-right: 1px solid #252526;
+    cursor: pointer;
+    font-size: 13px;
+    position: relative;
+    transition: background-color 0.1s;
+    user-select: none;
+}
+
+.tab.active {
+    background: #1e1e1e;
+    border-bottom: 2px solid #007acc;
+}
+
+.tab:hover {
+    background: #2a2d2e;
+}
+
+.tab.dragging {
+    opacity: 0.5;
+    cursor: move;
+}
+
+.tab.stdlib-tab {
+    background: #2d2d2d;
+    color: #cccccc;
+    font-style: italic;
+}
+
+.tab.stdlib-tab:hover {
+    background: #3a3a3a;
+}
+
+.tab-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    opacity: 0;
+    transition: all 0.1s;
+    flex-shrink: 0;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+    opacity: 0.6;
+}
+
+.tab-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 1 !important;
+}
