@@ -1,6 +1,7 @@
 import * as monaco from 'monaco-editor';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import { ApiPanel } from './api-panel.js';
+import { LSPClient } from './src/lsp/LSPClient.js';
 
 // Import CSS styles
 import './styles/base.css';
@@ -31,7 +32,7 @@ class PythonIDE {
         this.filePathBar = document.getElementById('filePathBar');
         this.executeButton = document.getElementById('executeButton');
         this.outputPanel = document.getElementById('outputPanel');
-        this.languageClient = null;
+        this.lspClient = null;
         this.snippets = {};
         this.ctrlPressed = false;
         this.currentLinkDecorations = [];
