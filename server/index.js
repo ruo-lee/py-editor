@@ -106,18 +106,27 @@ app.get('/api/files', async (req, res) => {
 app.get('/api/files/*', async (req, res) => {
     try {
         const basePath = getBasePath(req);
-        const filePath = path.join(basePath, req.params[0]);
+        // Decode URI component to handle special characters (Korean, etc.)
+        const decodedPath = decodeURIComponent(req.params[0]);
+        const filePath = path.join(basePath, decodedPath);
         const content = await fs.readFile(filePath, 'utf8');
         res.json({ content });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        // Return 404 if file doesn't exist, 500 for other errors
+        if (error.code === 'ENOENT') {
+            res.status(404).json({ error: 'File not found' });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
     }
 });
 
 app.post('/api/files/*', async (req, res) => {
     try {
         const basePath = getBasePath(req);
-        const filePath = path.join(basePath, req.params[0]);
+        // Decode URI component to handle special characters (Korean, etc.)
+        const decodedPath = decodeURIComponent(req.params[0]);
+        const filePath = path.join(basePath, decodedPath);
         const { content } = req.body;
 
         // Ensure directory exists
@@ -133,7 +142,9 @@ app.post('/api/files/*', async (req, res) => {
 app.delete('/api/files/*', async (req, res) => {
     try {
         const basePath = getBasePath(req);
-        const filePath = path.join(basePath, req.params[0]);
+        // Decode URI component to handle special characters (Korean, etc.)
+        const decodedPath = decodeURIComponent(req.params[0]);
+        const filePath = path.join(basePath, decodedPath);
         const stat = await fs.stat(filePath);
 
         if (stat.isDirectory()) {
@@ -397,7 +408,7 @@ except Exception as e:
             error += data.toString();
         });
 
-        python.on('close', async (code) => {
+        python.on('close', async (_code) => {
             try {
                 // Clean up temp file
                 await fs.unlink(tempFile).catch(() => {});

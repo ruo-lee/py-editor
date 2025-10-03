@@ -2278,7 +2278,9 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
 
     async checkIfFileExists(filepath) {
         try {
-            const response = await fetch(`/api/files/${filepath}`);
+            const response = await fetch(this.buildUrl(`/api/files/${filepath}`), {
+                headers: this.getFetchHeaders(),
+            });
             return response.ok;
         } catch (error) {
             return false;
