@@ -8,6 +8,7 @@ const WebSocket = require('ws');
 // const chokidar = require('chokidar'); // Reserved for future file watching
 const multer = require('multer');
 const archiver = require('archiver');
+const { proxyRequest } = require('./api-proxy');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -698,6 +699,43 @@ app.get('*', (req, res) => {
     } else {
         // Serve index.html for SPA routes
         res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    }
+});
+
+// API Proxy endpoint
+app.post('/api/proxy-request', async (req, res) => {
+    try {
+        const { method, url, params, headers, body } = req.body;
+
+        if (!method || !url) {
+            return res.status(400).json({ error: 'Method and URL are required' });
+        }
+
+        const result = await proxyRequest({ method, url, params, headers, body });
+
+        // Check if it's an SSE response
+        if (result.isSSE) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+
+            // Pipe the stream to response
+            result.stream.pipe(res);
+
+            result.stream.on('error', (error) => {
+                logger.error('SSE stream error', { error: error.message });
+                res.end();
+            });
+
+            result.stream.on('end', () => {
+                res.end();
+            });
+        } else {
+            res.json(result);
+        }
+    } catch (error) {
+        logger.error('API proxy error', { error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 

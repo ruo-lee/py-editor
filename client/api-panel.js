@@ -32,6 +32,7 @@ export class ApiPanel {
         panel.id = 'apiPanel';
         panel.className = 'api-panel';
         panel.innerHTML = `
+            <div class="api-panel-resizer" id="apiPanelResizer"></div>
             <div class="api-panel-header">
                 <div class="api-panel-title">API Request</div>
                 <button class="api-panel-close" id="apiPanelClose" title="Close">
@@ -49,7 +50,7 @@ export class ApiPanel {
                             ${this.domains.map((d) => `<option value="${d.url}" ${d.url === this.selectedDomain ? 'selected' : ''}>${d.name}</option>`).join('')}
                         </select>
                         <button class="api-domain-btn" id="apiDomainManage" title="Manage Domains">
-                            <i class="codicon codicon-settings-gear"></i>
+                            <i class="codicon codicon-gear"></i>
                         </button>
                     </div>
 
@@ -116,38 +117,26 @@ export class ApiPanel {
         this.setupEventListeners();
         this.initializeEditors();
         this.addInitialRows();
+        this.setupResizer();
     }
 
     initializeEditors() {
-        // Body Editor (JSON)
+        // Body Editor (Simple textarea to avoid Monaco worker issues)
         const bodyEditorEl = document.getElementById('apiBodyEditor');
-        if (bodyEditorEl && this.monaco) {
-            this.bodyEditor = this.monaco.editor.create(bodyEditorEl, {
-                value: '{\n  \n}',
-                language: 'json',
-                theme: document.body.classList.contains('light-theme') ? 'vs' : 'vs-dark',
-                minimap: { enabled: false },
-                fontSize: 13,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-            });
+        if (bodyEditorEl) {
+            bodyEditorEl.innerHTML = `
+                <textarea class="api-simple-editor" id="apiBodyTextarea" placeholder="Request body (JSON)">{\n  \n}</textarea>
+            `;
+            this.bodyEditor = document.getElementById('apiBodyTextarea');
         }
 
-        // Response Editor (Read-only)
+        // Response Editor (Simple pre element)
         const responseEditorEl = document.getElementById('apiResponseEditor');
-        if (responseEditorEl && this.monaco) {
-            this.responseEditor = this.monaco.editor.create(responseEditorEl, {
-                value: '',
-                language: 'json',
-                theme: document.body.classList.contains('light-theme') ? 'vs' : 'vs-dark',
-                minimap: { enabled: false },
-                fontSize: 13,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                readOnly: true,
-                automaticLayout: true,
-            });
+        if (responseEditorEl) {
+            responseEditorEl.innerHTML = `
+                <pre class="api-simple-viewer" id="apiResponseViewer"></pre>
+            `;
+            this.responseEditor = document.getElementById('apiResponseViewer');
         }
     }
 
@@ -262,7 +251,7 @@ export class ApiPanel {
         const urlPath = document.getElementById('apiUrl').value.trim();
         const params = this.collectKeyValuePairs('params');
         const headers = this.collectKeyValuePairs('headers');
-        const body = this.bodyEditor ? this.bodyEditor.getValue() : '';
+        const body = this.bodyEditor ? this.bodyEditor.value : '';
 
         // Build full URL
         let fullUrl = this.selectedDomain + urlPath;
@@ -281,6 +270,17 @@ export class ApiPanel {
         const startTime = Date.now();
 
         try {
+            // Parse body if it's JSON
+            let parsedBody = null;
+            if (body.trim()) {
+                try {
+                    parsedBody = JSON.parse(body);
+                } catch (e) {
+                    // If not valid JSON, send as string
+                    parsedBody = body;
+                }
+            }
+
             const response = await fetch('/api/proxy-request', {
                 method: 'POST',
                 headers: {
@@ -291,7 +291,7 @@ export class ApiPanel {
                     url: fullUrl,
                     params,
                     headers,
-                    body: body.trim() ? body : null,
+                    body: parsedBody,
                 }),
             });
 
@@ -345,7 +345,7 @@ export class ApiPanel {
 
                 // Update response editor with accumulated data
                 if (this.responseEditor) {
-                    this.responseEditor.setValue(accumulatedData);
+                    this.responseEditor.textContent = accumulatedData;
                 }
             }
 
@@ -366,13 +366,13 @@ export class ApiPanel {
         if (this.responseEditor) {
             const formattedBody =
                 typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
-            this.responseEditor.setValue(formattedBody);
+            this.responseEditor.textContent = formattedBody;
         }
     }
 
     showError(message) {
         if (this.responseEditor) {
-            this.responseEditor.setValue(`Error: ${message}`);
+            this.responseEditor.textContent = `Error: ${message}`;
         }
     }
 
@@ -474,14 +474,14 @@ export class ApiPanel {
     show() {
         const panel = document.getElementById('apiPanel');
         if (panel) {
-            panel.classList.add('visible');
+            panel.classList.add('show');
         }
     }
 
     hide() {
         const panel = document.getElementById('apiPanel');
         if (panel) {
-            panel.classList.remove('visible');
+            panel.classList.remove('show');
         }
     }
 
@@ -492,5 +492,40 @@ export class ApiPanel {
         if (this.responseEditor) {
             this.monaco.editor.setTheme(theme);
         }
+    }
+
+    setupResizer() {
+        const resizer = document.getElementById('apiPanelResizer');
+        const panel = document.getElementById('apiPanel');
+
+        if (!resizer || !panel) return;
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = panel.offsetWidth;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            const diff = startX - e.clientX;
+            const newWidth = Math.max(450, Math.min(1000, startWidth + diff));
+            panel.style.width = `${newWidth}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
     }
 }

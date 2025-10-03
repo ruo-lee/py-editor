@@ -1,5 +1,6 @@
 import * as monaco from 'monaco-editor';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import { ApiPanel } from './api-panel.js';
 
 // Configure Monaco Editor environment
 self.MonacoEnvironment = {
@@ -27,6 +28,7 @@ class PythonIDE {
         this.selectedItem = null; // Currently selected file/directory item {path, type}
         this.contextMenuTarget = null; // Target element for context menu
         this.showHiddenFiles = localStorage.getItem('show-hidden-files') === 'true'; // Hidden files visibility
+        this.apiPanel = null; // API Request Panel
 
         // Parse workspace folder from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -52,6 +54,7 @@ class PythonIDE {
         this.setupEventListeners();
         this.initializeSidebarResize();
         this.initializeWorkspaceSection();
+        this.initializeApiPanel();
     }
 
     // Helper method to add workspace folder to requests
@@ -3570,6 +3573,11 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         this.currentTheme = this.currentTheme === 'vs-dark' ? 'vs' : 'vs-dark';
         this.applyTheme(this.currentTheme);
         localStorage.setItem('editor-theme', this.currentTheme);
+
+        // Update API panel theme
+        if (this.apiPanel) {
+            this.apiPanel.updateTheme(this.currentTheme);
+        }
     }
 
     applyTheme(theme) {
@@ -3656,6 +3664,26 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
             icon.className = 'codicon codicon-eye';
         } else {
             icon.className = 'codicon codicon-eye-closed';
+        }
+    }
+
+    initializeApiPanel() {
+        // Create API panel instance
+        this.apiPanel = new ApiPanel();
+
+        // Create and append panel to DOM
+        const panel = this.apiPanel.createPanel();
+        document.body.appendChild(panel);
+
+        // Initialize with Monaco
+        this.apiPanel.initialize(monaco);
+
+        // Setup toggle button
+        const apiToggleBtn = document.getElementById('apiToggleBtn');
+        if (apiToggleBtn) {
+            apiToggleBtn.addEventListener('click', () => {
+                this.apiPanel.show();
+            });
         }
     }
 }
