@@ -26,6 +26,7 @@ class PythonIDE {
         this.selectedDirectory = ''; // Currently selected directory for context menu operations
         this.selectedItem = null; // Currently selected file/directory item {path, type}
         this.contextMenuTarget = null; // Target element for context menu
+        this.showHiddenFiles = localStorage.getItem('show-hidden-files') === 'true'; // Hidden files visibility
 
         // Parse workspace folder from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -1188,6 +1189,10 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         }
 
         files.forEach((item) => {
+            // Filter hidden files (files/folders starting with .)
+            if (!this.showHiddenFiles && item.name.startsWith('.')) {
+                return;
+            }
             const element = document.createElement('div');
 
             if (item.type === 'directory') {
@@ -1197,7 +1202,6 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
                 element.setAttribute('draggable', 'true');
                 element.innerHTML = `
                     <i class="codicon codicon-chevron-right folder-toggle"></i>
-                    <i class="codicon codicon-folder file-icon" style="color: #dcb67a;"></i>
                     <span>${item.name}</span>
                 `;
 
@@ -2093,6 +2097,10 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         document.getElementById('collapseAllBtn').addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent workspace header from toggling
             this.collapseAllFolders();
+        });
+
+        document.getElementById('toggleHiddenBtn').addEventListener('click', () => {
+            this.toggleHiddenFiles();
         });
 
         // Output panel close button (left editor)
@@ -3598,6 +3606,23 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
         });
     }
 
+    toggleHiddenFiles() {
+        this.showHiddenFiles = !this.showHiddenFiles;
+        localStorage.setItem('show-hidden-files', this.showHiddenFiles);
+
+        // Update icon
+        const toggleBtn = document.getElementById('toggleHiddenBtn');
+        const icon = toggleBtn.querySelector('i');
+        if (this.showHiddenFiles) {
+            icon.className = 'codicon codicon-eye';
+        } else {
+            icon.className = 'codicon codicon-eye-closed';
+        }
+
+        // Reload file explorer
+        this.loadFileExplorer();
+    }
+
     initializeWorkspaceSection() {
         const workspaceHeader = document.getElementById('workspaceHeader');
         const workspaceToggle = document.getElementById('workspaceToggle');
@@ -3621,6 +3646,15 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
             workspaceContent.classList.toggle('expanded');
             localStorage.setItem('workspace-expanded', expanded);
         });
+
+        // Initialize hidden files icon
+        const toggleBtn = document.getElementById('toggleHiddenBtn');
+        const icon = toggleBtn.querySelector('i');
+        if (this.showHiddenFiles) {
+            icon.className = 'codicon codicon-eye';
+        } else {
+            icon.className = 'codicon codicon-eye-closed';
+        }
     }
 }
 
