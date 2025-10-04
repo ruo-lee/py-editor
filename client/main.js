@@ -1018,5 +1018,5 @@ class PythonIDE {
 
 // Initialize the IDE when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new PythonIDE();
+    window.app = new PythonIDE();
 });

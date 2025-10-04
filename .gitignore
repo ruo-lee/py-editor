@@ -21,3 +21,19 @@ yarn-error.log*
 
 # Build
 client/dist/
+
+# Playwright & Testing
+client/playwright-report/
+client/test-results/
+server/test-results/
+test-results/
+playwright-report/
+*.png
+*.webm
+**/error-context.md
+**/.last-run.json
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
