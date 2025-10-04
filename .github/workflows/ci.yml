@@ -43,10 +43,25 @@ jobs:
             - name: Install Playwright browsers
               run: cd client && npx playwright install --with-deps chromium
 
+            - name: Start server in background
+              run: |
+                  cd server && npm start &
+                  echo $! > server.pid
+                  sleep 5
+                  curl --retry 10 --retry-delay 2 --retry-connrefused http://localhost:8080 || exit 1
+
             - name: Run client E2E tests
               run: cd client && npm test
               env:
                   CI: true
+
+            - name: Stop server
+              if: always()
+              run: |
+                  if [ -f server.pid ]; then
+                    kill $(cat server.pid) || true
+                    rm server.pid
+                  fi
 
             - name: Upload test results
               if: always()

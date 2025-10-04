@@ -40,11 +40,14 @@ export default defineConfig({
         },
     ],
 
-    // Automatically start server for both local and CI environments
-    webServer: {
-        command: 'cd ../server && npm start',
-        url: 'http://localhost:8080',
-        timeout: 120000,
-        reuseExistingServer: !process.env.CI,
-    },
+    // Automatically start server for local development only
+    // In CI, server is started explicitly in GitHub Actions
+    webServer: process.env.CI
+        ? undefined
+        : {
+              command: 'cd ../server && npm start',
+              url: 'http://localhost:8080',
+              timeout: 120000,
+              reuseExistingServer: true,
+          },
 });
