@@ -16,6 +16,7 @@
 - 🖥️ **Split View** - 좌우 분할 에디터로 동시 작업
 - ✂️ **스니펫 지원** - Python 코드 템플릿 (커스터마이징 가능)
 - 🏃 **코드 실행** - 내장 Python 인터프리터로 즉시 실행
+- 🌐 **API 요청 도구** - Postman 스타일 HTTP 클라이언트 내장
 - 🎨 **Monaco Editor** - VS Code와 동일한 편집기 엔진
 - 🔒 **폐쇄망 지원** - 외부 네트워크 연결 불필요
 
@@ -172,6 +173,32 @@ if condition:
 - 좌우 에디터에서 서로 다른 파일 편집
 - 독립적인 탭 관리
 - 드래그로 리사이즈 가능
+
+### 6️⃣ API 요청 도구
+
+**기능**: Postman과 유사한 HTTP 클라이언트 내장
+
+**실행**:
+
+- 우상단 지구본 아이콘 클릭
+
+**지원 기능**:
+
+- HTTP 메소드: GET, POST, PUT, PATCH, DELETE
+- Query Parameters, Headers, Request Body 설정
+- JSON 및 SSE(Server-Sent Events) 응답 지원
+- 도메인 관리 (여러 API 서버 저장)
+- 라이트/다크 테마 자동 적용
+- 패널 크기 조절 (450px ~ 1000px)
+
+**사용법**:
+
+1. 도메인 설정: 톱니바퀴 아이콘 → 도메인 추가
+2. 요청 설정: 메소드 선택, URL 입력
+3. 옵션 추가: Params/Headers/Body 탭에서 설정
+4. Send 버튼으로 요청 실행
+
+자세한 내용은 [API 요청 도구 가이드](docs/API_REQUEST_TOOL.md)를 참고하세요.
 
 ## 🛠️ 고급 설정
 
@@ -537,20 +564,21 @@ npm run dev  # 파일 변경 시 자동 reload
 
 ### API 엔드포인트
 
-| Method | Path                | Description            |
-| ------ | ------------------- | ---------------------- |
-| GET    | `/api/files`        | 파일 목록 조회         |
-| GET    | `/api/files/*`      | 파일 내용 읽기         |
-| POST   | `/api/files/*`      | 파일 생성/수정         |
-| DELETE | `/api/files/*`      | 파일/폴더 삭제         |
-| POST   | `/api/mkdir`        | 디렉토리 생성          |
-| POST   | `/api/move`         | 파일/폴더 이동         |
-| POST   | `/api/upload`       | 파일 업로드            |
-| GET    | `/api/download/*`   | 파일/폴더 다운로드     |
-| POST   | `/api/execute`      | Python 코드 실행       |
-| POST   | `/api/check-syntax` | 실시간 syntax 검사     |
-| GET    | `/api/snippets`     | 스니펫 목록            |
-| GET    | `/api/stdlib/*`     | Python 표준 라이브러리 |
+| Method | Path                 | Description            |
+| ------ | -------------------- | ---------------------- |
+| GET    | `/api/files`         | 파일 목록 조회         |
+| GET    | `/api/files/*`       | 파일 내용 읽기         |
+| POST   | `/api/files/*`       | 파일 생성/수정         |
+| DELETE | `/api/files/*`       | 파일/폴더 삭제         |
+| POST   | `/api/mkdir`         | 디렉토리 생성          |
+| POST   | `/api/move`          | 파일/폴더 이동         |
+| POST   | `/api/upload`        | 파일 업로드            |
+| GET    | `/api/download/*`    | 파일/폴더 다운로드     |
+| POST   | `/api/execute`       | Python 코드 실행       |
+| POST   | `/api/check-syntax`  | 실시간 syntax 검사     |
+| GET    | `/api/snippets`      | 스니펫 목록            |
+| GET    | `/api/stdlib/*`      | Python 표준 라이브러리 |
+| POST   | `/api/proxy-request` | API 프록시 요청        |
 
 ### WebSocket (Language Server)
 

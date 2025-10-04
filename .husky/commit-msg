@@ -1,15 +1,16 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Commit message format validation
-commit_regex='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?: .{1,100}'
+# Commit message format validation (supports Korean and other Unicode characters)
+commit_regex='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:[[:space:]]*.+'
 
-if ! grep -iqE "$commit_regex" "$1"; then
+if ! grep -qE "$commit_regex" "$1"; then
     echo "❌ Invalid commit message format"
     echo ""
     echo "Format: <type>(<scope>): <subject>"
     echo ""
     echo "Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci"
     echo "Example: feat(editor): add real-time syntax checking"
+    echo "Example: refactor(client): 환영 페이지 추가"
     exit 1
 fi

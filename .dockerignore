@@ -6,6 +6,15 @@ server/node_modules/
 # Build outputs (will be built in Docker)
 client/dist/
 
+# Test files (not needed in production)
+**/__tests__/
+**/*.test.js
+**/*.spec.js
+**/coverage/
+jest.config.js
+.jest/
+server/README.test.md
+
 # Git and version control
 .git/
 .gitignore
@@ -35,3 +44,4 @@ yarn-error.log*
 
 # Documentation (optional - remove if you want README in image)
 README.md
+docs/

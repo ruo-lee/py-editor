@@ -1,0 +1,140 @@
+/* Editor area and Monaco editor styles */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    min-width: 0;
+}
+
+.editor-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.editor-group.focused {
+    opacity: 1;
+}
+
+.editor-group.split {
+    border-right: 1px solid #3e3e42;
+}
+
+.split-divider {
+    width: 4px;
+    background: #2d2d30;
+    cursor: col-resize;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.split-divider:hover {
+    background: #007acc;
+}
+
+.split-divider:active {
+    background: #1e90ff;
+    cursor: col-resize;
+}
+
+.editor-container {
+    flex: 1;
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+#editor, #editor2 {
+    height: 100%;
+    width: 100%;
+    flex: 1;
+}
+
+/* Placeholder for empty split editor */
+.editor-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    background: #1e1e1e;
+    color: #858585;
+    text-align: center;
+    gap: 16px;
+    user-select: none;
+}
+
+.editor-placeholder i {
+    font-size: 64px;
+    opacity: 0.3;
+}
+
+.editor-placeholder p {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Light theme placeholder */
+body.light-theme .editor-placeholder {
+    background: #f3f3f3;
+    color: #616161;
+}
+
+.file-path-bar {
+    height: 24px;
+    background: #1e1e1e;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 11px;
+    color: #cccccc;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-path-bar.stdlib {
+    background: #2d2d2d;
+    color: #888888;
+    font-style: italic;
+}
+
+/* Monaco editor enhancements */
+.highlight-definition {
+    background-color: rgba(255, 255, 0, 0.2);
+    border: 1px solid rgba(255, 255, 0, 0.4);
+}
+
+/* Ctrl+hover link styling */
+.ctrl-hover-link {
+    color: #4FC3F7 !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+}
+
+.monaco-editor .view-line .ctrl-hover-link {
+    color: #4FC3F7 !important;
+    text-decoration: underline !important;
+}
+
+.monaco-editor.ctrl-key-pressed {
+    cursor: pointer !important;
+}
+
+.monaco-editor .view-line span:hover {
+    transition: color 0.1s ease-in-out;
+}
+
+.monaco-editor .decorationsOverviewRuler {
+    z-index: 1;
+}

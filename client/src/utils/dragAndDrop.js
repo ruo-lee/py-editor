@@ -12,7 +12,7 @@ export function makeDraggable(element, data) {
         element.classList.add('dragging');
     });
 
-    element.addEventListener('dragend', (e) => {
+    element.addEventListener('dragend', (_e) => {
         element.classList.remove('dragging');
     });
 }
@@ -27,7 +27,7 @@ export function makeDroppable(element, onDrop) {
         element.classList.add('drag-over');
     });
 
-    element.addEventListener('dragleave', (e) => {
+    element.addEventListener('dragleave', (_e) => {
         element.classList.remove('drag-over');
     });
 

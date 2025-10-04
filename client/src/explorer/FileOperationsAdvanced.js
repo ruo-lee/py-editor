@@ -1,0 +1,224 @@
+import * as monaco from 'monaco-editor';
+
+/**
+ * FileOperationsAdvanced - Advanced file operations (duplicate, delete, move, copy)
+ */
+export class FileOperationsAdvanced {
+    constructor(context) {
+        this.context = context;
+
+        // Cache for file existence checks
+        this.fileExistsCache = new Map();
+        this.cacheTimeout = 3000; // 3 seconds cache
+    }
+
+    async duplicateItem(filePath, type) {
+        const fileName = filePath.split('/').pop();
+        const extension = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
+        const baseName = fileName.replace(extension, '');
+        const parentPath = filePath.substring(0, filePath.lastIndexOf('/'));
+
+        let copyName = `${baseName}_copy${extension}`;
+        let counter = 1;
+
+        // Check if copy already exists and increment counter
+        while (await this.fileExists(parentPath ? `${parentPath}/${copyName}` : copyName)) {
+            copyName = `${baseName}_copy${counter}${extension}`;
+            counter++;
+        }
+
+        try {
+            // Save expanded folder states before reloading
+            const expandedFolders = this.context.fileExplorerInstance.getExpandedFolders();
+
+            const newPath = parentPath ? `${parentPath}/${copyName}` : copyName;
+            await this.copyItem(filePath, newPath, type);
+
+            // Reload and restore expanded folders
+            await this.context.loadFileExplorer();
+
+            // Restore expanded folders after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                this.context.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
+            }, 100);
+        } catch (error) {
+            alert('Failed to duplicate: ' + error.message);
+        }
+    }
+
+    async deleteItem(filePath, type) {
+        await this.context.dialogManager.showDeleteConfirmation(
+            filePath,
+            type,
+            async (path, type) => {
+                const response = await fetch(this.context.buildUrl(`/api/files/${path}`), {
+                    method: 'DELETE',
+                    headers: this.context.getFetchHeaders(),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete item');
+                }
+
+                // Close tab if file is open
+                if (type === 'file' && this.context.openTabs.has(path)) {
+                    this.context.closeTab(path);
+                }
+
+                // Clear selected directory if it was deleted or is a child of deleted directory
+                if (
+                    this.context.selectedDirectory === path ||
+                    this.context.selectedDirectory.startsWith(path + '/')
+                ) {
+                    this.context.selectedDirectory = '';
+                }
+            },
+            async () => {
+                // Save expanded folder states before reloading
+                const expandedFolders = this.context.fileExplorerInstance.getExpandedFolders();
+
+                await this.context.loadFileExplorer();
+
+                // Restore expanded folders after a short delay
+                setTimeout(() => {
+                    this.context.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
+                }, 100);
+            }
+        );
+    }
+
+    async moveItem(oldPath, newPath) {
+        // If the file is open, notify LSP that it's closing
+        if (this.context.openTabs.has(oldPath)) {
+            this.context.notifyDocumentClosed(oldPath);
+        }
+
+        // Use the /api/move endpoint for both files and folders
+        const response = await fetch(this.context.buildUrl('/api/move'), {
+            method: 'POST',
+            headers: this.context.getFetchHeaders(),
+            body: JSON.stringify({
+                sourcePath: oldPath,
+                targetPath: newPath,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to move item');
+        }
+
+        // Update selected directory if it was moved
+        if (this.context.selectedDirectory === oldPath) {
+            this.context.selectedDirectory = newPath;
+        } else if (this.context.selectedDirectory.startsWith(oldPath + '/')) {
+            this.context.selectedDirectory = this.context.selectedDirectory.replace(
+                oldPath,
+                newPath
+            );
+        }
+
+        // Update open tabs and notify LSP about the new file
+        if (this.context.openTabs.has(oldPath)) {
+            const tabData = this.context.openTabs.get(oldPath);
+
+            // Update Monaco model URI
+            const oldModel = tabData.model;
+            const content = oldModel.getValue();
+            const language = oldModel.getLanguageId();
+
+            // Create new model with new URI
+            const newModel = monaco.editor.createModel(content, language, monaco.Uri.file(newPath));
+
+            // Dispose old model
+            oldModel.dispose();
+
+            // Update tab data
+            this.context.openTabs.delete(oldPath);
+            this.context.openTabs.set(newPath, {
+                ...tabData,
+                model: newModel,
+            });
+            this.context.activeFile = newPath;
+
+            // Update editor model
+            this.context.editor.setModel(newModel);
+
+            // Notify LSP about the new file
+            this.context.notifyDocumentOpened(newPath, content);
+
+            // Update tab display
+            const tab = document.querySelector(`[data-filepath="${oldPath}"]`);
+            if (tab) {
+                tab.setAttribute('data-filepath', newPath);
+                tab.querySelector('span').textContent = newPath.split('/').pop();
+            }
+        }
+    }
+
+    async copyItem(sourcePath, targetPath, _type) {
+        // Use the new /api/duplicate endpoint which supports both files and directories
+        const response = await fetch(this.context.buildUrl('/api/duplicate'), {
+            method: 'POST',
+            headers: {
+                ...this.context.getFetchHeaders(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sourcePath, targetPath }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to duplicate item');
+        }
+    }
+
+    async fileExists(filePath) {
+        // Check cache first
+        const cached = this.fileExistsCache.get(filePath);
+        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+            return cached.exists;
+        }
+
+        try {
+            const response = await fetch(this.context.buildUrl(`/api/files/${filePath}`), {
+                headers: this.context.getFetchHeaders(),
+            });
+            const exists = response.ok;
+
+            // Cache the result
+            this.fileExistsCache.set(filePath, {
+                exists,
+                timestamp: Date.now(),
+            });
+
+            return exists;
+        } catch {
+            // Cache negative result
+            this.fileExistsCache.set(filePath, {
+                exists: false,
+                timestamp: Date.now(),
+            });
+            return false;
+        }
+    }
+
+    async renameItem(filePath, type) {
+        this.context.dialogManager.showRenameDialog(
+            filePath,
+            type,
+            (oldPath, newPath) => this.moveItem(oldPath, newPath),
+            async () => {
+                // Save expanded folder states before reloading
+                const expandedFolders = this.context.fileExplorerInstance.getExpandedFolders();
+
+                await this.context.loadFileExplorer();
+
+                // Restore expanded folders after a short delay
+                setTimeout(() => {
+                    this.context.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
+                }, 100);
+            }
+        );
+    }
+}
