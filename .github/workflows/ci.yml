@@ -20,6 +20,17 @@ jobs:
                   node-version: '18'
                   cache: 'npm'
 
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.11'
+                  cache: 'pip'
+
+            - name: Install Python LSP Server
+              run: |
+                  pip install python-lsp-server[all]
+                  pip install pylsp-mypy pyflakes
+
             - name: Install dependencies
               run: |
                   npm install
@@ -34,6 +45,8 @@ jobs:
 
             - name: Run client E2E tests
               run: cd client && npm test
+              env:
+                  CI: true
 
             - name: Upload test results
               if: always()
