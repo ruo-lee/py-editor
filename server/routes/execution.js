@@ -40,7 +40,28 @@ router.post('/execute', async (req, res) => {
 // POST /api/proxy-request - Proxy API requests
 router.post('/proxy-request', async (req, res) => {
     try {
-        await proxyRequest(req, res);
+        const result = await proxyRequest(req.body);
+
+        // Handle SSE responses
+        if (result.isSSE) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+
+            // Pipe the stream to client
+            result.stream.pipe(res);
+
+            result.stream.on('end', () => {
+                res.end();
+            });
+
+            result.stream.on('error', (_error) => {
+                res.end();
+            });
+        } else {
+            // Regular JSON response
+            res.json(result);
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

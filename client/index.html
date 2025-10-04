@@ -9,12 +9,18 @@
     <div id="app">
         <div class="header">
             <span class="app-title">PyEditor</span>
-            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
-                <i class="codicon codicon-color-mode"></i>
-            </button>
+            <div class="header-actions">
+                <button class="header-btn" id="apiToggleBtn" title="API Request">
+                    <i class="codicon codicon-globe"></i>
+                </button>
+                <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
+                    <i class="codicon codicon-color-mode"></i>
+                </button>
+            </div>
         </div>
         <div class="main-content">
-            <div class="sidebar" id="sidebar">
+            <div class="editor-workspace">
+                <div class="sidebar" id="sidebar">
                 <div class="explorer-header">
                     <div class="explorer-title">Explorer</div>
                     <button class="action-button" id="toggleHiddenBtn" title="Toggle Hidden Files">
@@ -42,23 +48,21 @@
                     </div>
                 </div>
                 <div class="workspace-content" id="workspaceContent">
-                    <div class="file-explorer" id="fileExplorer">
+                    <div class="file-explorer" id="fileExplorer" tabindex="0">
                         <div class="loading">Loading files...</div>
                     </div>
                 </div>
                 <div class="sidebar-resizer" id="sidebarResizer"></div>
             </div>
             <div class="editor-area" id="editorArea">
-                <div class="editor-group" id="editorGroup1">
+                <div class="editor-group">
                     <div class="tab-bar" id="tabBar">
+                        <div class="tab-bar-tabs"></div>
                         <div class="tab-bar-actions">
                             <button class="execute-btn" id="executeButton" title="Run Code (Ctrl+R)" style="display: none;">
                                 <i class="codicon codicon-play"></i>
                             </button>
-                            <button class="split-toggle-btn" id="apiToggleBtn" title="API Request">
-                                <i class="codicon codicon-globe"></i>
-                            </button>
-                            <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor">
+                            <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor" style="display: none;">
                                 <i class="codicon codicon-split-horizontal"></i>
                             </button>
                         </div>
@@ -67,17 +71,18 @@
                     <div class="editor-container">
                         <div id="editor"></div>
                     </div>
-                    <div class="output-panel" id="outputPanel" style="display: none;">
-                        <div class="output-panel-resizer" id="outputPanelResizer"></div>
-                        <div class="output-panel-header">
-                            <div class="output-panel-title">Output</div>
-                            <button class="output-panel-close" id="outputPanelClose" title="Close Output">
-                                <i class="codicon codicon-close"></i>
-                            </button>
-                        </div>
-                        <div class="output-panel-content" id="outputPanelContent"></div>
-                    </div>
                 </div>
+            </div>
+            </div>
+            <div class="output-panel" id="outputPanel" style="display: none;">
+                <div class="output-panel-resizer" id="outputPanelResizer"></div>
+                <div class="output-panel-header">
+                    <div class="output-panel-title">Output</div>
+                    <button class="output-panel-close" id="outputPanelClose" title="Close Output">
+                        <i class="codicon codicon-close"></i>
+                    </button>
+                </div>
+                <div class="output-panel-content" id="outputPanelContent"></div>
             </div>
         </div>
     </div>

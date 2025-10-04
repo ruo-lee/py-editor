@@ -43,6 +43,21 @@ router.post('/move', async (req, res) => {
     }
 });
 
+// POST /api/duplicate - Duplicate file or directory
+router.post('/duplicate', async (req, res) => {
+    try {
+        const basePath = getBasePath(req);
+        const { sourcePath, targetPath } = req.body;
+        const fullSourcePath = path.join(basePath, sourcePath);
+        const fullTargetPath = path.join(basePath, targetPath);
+
+        await fileService.copyItem(fullSourcePath, fullTargetPath);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /api/upload - Upload files
 router.post('/upload', upload.array('files'), async (req, res) => {
     try {
@@ -104,11 +119,12 @@ router.get('/download/*', async (req, res) => {
 // GET /api/snippets - Get Python snippets
 router.get('/snippets', async (req, res) => {
     try {
-        const snippetsPath = path.join(__dirname, '../snippets.json');
+        const snippetsPath = path.join(__dirname, '../../snippets/python.json');
         const snippets = JSON.parse(await fs.readFile(snippetsPath, 'utf8'));
         res.json(snippets);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.warn('Snippets file not found, returning empty object', { error: error.message });
+        res.json({});
     }
 });
 
@@ -116,20 +132,31 @@ router.get('/snippets', async (req, res) => {
 router.get('/stdlib/*', async (req, res) => {
     try {
         const stdlibPath = req.params[0];
-        const fullPath = path.join('/usr/lib/python3.11', stdlibPath);
+        // Try multiple possible Python stdlib locations
+        const possiblePaths = [
+            `/usr/local/lib/python3.11/${stdlibPath}`,
+            `/usr/lib/python3.11/${stdlibPath}`,
+            `/usr/local/lib/python3.12/${stdlibPath}`,
+            `/usr/lib/python3.12/${stdlibPath}`,
+        ];
 
-        if (!fullPath.startsWith('/usr/lib/python3.11')) {
-            return res.status(403).json({ error: 'Access denied' });
+        for (const fullPath of possiblePaths) {
+            try {
+                const content = await fs.readFile(fullPath, 'utf8');
+                return res.json({ content });
+            } catch (err) {
+                if (err.code !== 'ENOENT') {
+                    throw err;
+                }
+                // Continue to next path
+            }
         }
 
-        const content = await fs.readFile(fullPath, 'utf8');
-        res.json({ content });
+        // None of the paths worked
+        res.status(404).json({ error: 'File not found in Python stdlib' });
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            res.status(404).json({ error: 'File not found' });
-        } else {
-            res.status(500).json({ error: error.message });
-        }
+        logger.error('Error reading stdlib file', { error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 

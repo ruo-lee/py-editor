@@ -102,10 +102,32 @@ export class ApiPanel {
                 <!-- Response Section -->
                 <div class="api-response-section">
                     <div class="api-response-header">
-                        <span class="api-response-title">Response</span>
-                        <span class="api-response-meta" id="apiResponseMeta"></span>
+                        <div class="api-response-header-left">
+                            <span class="api-response-title">Response</span>
+                            <span class="api-response-meta" id="apiResponseMeta"></span>
+                        </div>
+                        <div class="api-response-controls">
+                            <button class="api-response-action" id="apiToggleWrap" title="Toggle Word Wrap">
+                                <i class="codicon codicon-word-wrap"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="api-response-editor" id="apiResponseEditor"></div>
+
+                    <!-- Response Tabs -->
+                    <div class="api-response-tabs">
+                        <button class="api-response-tab active" data-tab="body">Body</button>
+                        <button class="api-response-tab" data-tab="headers">Headers</button>
+                    </div>
+
+                    <!-- Response Tab Contents -->
+                    <div class="api-response-tab-content">
+                        <div class="api-response-tab-panel active" id="apiResponseBodyPanel">
+                            <div class="api-response-editor" id="apiResponseEditor"></div>
+                        </div>
+                        <div class="api-response-tab-panel" id="apiResponseHeadersPanel">
+                            <div class="api-response-headers-viewer" id="apiResponseHeaders"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -121,22 +143,47 @@ export class ApiPanel {
     }
 
     initializeEditors() {
-        // Body Editor (Simple textarea to avoid Monaco worker issues)
+        // Body Editor with Monaco
         const bodyEditorEl = document.getElementById('apiBodyEditor');
-        if (bodyEditorEl) {
-            bodyEditorEl.innerHTML = `
-                <textarea class="api-simple-editor" id="apiBodyTextarea" placeholder="Request body (JSON)">{\n  \n}</textarea>
-            `;
-            this.bodyEditor = document.getElementById('apiBodyTextarea');
+        if (bodyEditorEl && this.monaco) {
+            this.bodyEditor = this.monaco.editor.create(bodyEditorEl, {
+                value: '{\n  \n}',
+                language: 'json',
+                theme: 'vs-dark',
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                automaticLayout: true,
+                tabSize: 2,
+                formatOnPaste: true,
+                formatOnType: false,
+                scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto',
+                },
+                wordWrap: 'on',
+            });
         }
 
-        // Response Editor (Simple pre element)
+        // Response Editor with Monaco (read-only)
         const responseEditorEl = document.getElementById('apiResponseEditor');
-        if (responseEditorEl) {
-            responseEditorEl.innerHTML = `
-                <pre class="api-simple-viewer" id="apiResponseViewer"></pre>
-            `;
-            this.responseEditor = document.getElementById('apiResponseViewer');
+        if (responseEditorEl && this.monaco) {
+            this.responseEditor = this.monaco.editor.create(responseEditorEl, {
+                value: '',
+                language: 'json',
+                theme: 'vs-dark',
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                readOnly: true,
+                automaticLayout: true,
+                tabSize: 2,
+                scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto',
+                },
+                wordWrap: 'on',
+            });
         }
     }
 
@@ -177,6 +224,48 @@ export class ApiPanel {
             this.selectedDomain = e.target.value;
             localStorage.setItem('api-selected-domain', this.selectedDomain);
         });
+
+        // Toggle word wrap
+        document.getElementById('apiToggleWrap').addEventListener('click', () => {
+            this.toggleWordWrap();
+        });
+
+        // Response tab switching
+        document.querySelectorAll('.api-response-tab').forEach((tab) => {
+            tab.addEventListener('click', (e) => {
+                const tabName = e.target.dataset.tab;
+                this.switchResponseTab(tabName);
+            });
+        });
+    }
+
+    switchResponseTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.api-response-tab').forEach((tab) => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+
+        // Update tab panels
+        document.querySelectorAll('.api-response-tab-panel').forEach((panel) => {
+            panel.classList.remove('active');
+        });
+
+        const targetPanel = {
+            body: 'apiResponseBodyPanel',
+            headers: 'apiResponseHeadersPanel',
+        }[tabName];
+
+        document.getElementById(targetPanel).classList.add('active');
+    }
+
+    toggleWordWrap() {
+        if (this.responseEditor) {
+            const currentWrap = this.responseEditor.getOption(
+                this.monaco.editor.EditorOption.wordWrap
+            );
+            const newWrap = currentWrap === 'on' ? 'off' : 'on';
+            this.responseEditor.updateOptions({ wordWrap: newWrap });
+        }
     }
 
     addInitialRows() {
@@ -251,7 +340,7 @@ export class ApiPanel {
         const urlPath = document.getElementById('apiUrl').value.trim();
         const params = this.collectKeyValuePairs('params');
         const headers = this.collectKeyValuePairs('headers');
-        const body = this.bodyEditor ? this.bodyEditor.value : '';
+        const body = this.bodyEditor ? this.bodyEditor.getValue() : '';
 
         // Build full URL
         let fullUrl = this.selectedDomain + urlPath;
@@ -327,9 +416,21 @@ export class ApiPanel {
         metaEl.textContent = `Streaming... - ${duration}ms`;
         metaEl.className = 'api-response-meta streaming';
 
+        // Extract and display response headers
+        const responseHeaders = {};
+        response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+        this.displayHeaders(responseHeaders);
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulatedData = '';
+
+        // Set plain text language for SSE
+        if (this.responseEditor) {
+            this.monaco.editor.setModelLanguage(this.responseEditor.getModel(), 'plaintext');
+        }
 
         try {
             let reading = true;
@@ -345,7 +446,11 @@ export class ApiPanel {
 
                 // Update response editor with accumulated data
                 if (this.responseEditor) {
-                    this.responseEditor.textContent = accumulatedData;
+                    this.responseEditor.setValue(accumulatedData);
+                    // Scroll to bottom to show latest data
+                    const model = this.responseEditor.getModel();
+                    const lastLine = model.getLineCount();
+                    this.responseEditor.revealLine(lastLine);
                 }
             }
 
@@ -363,16 +468,72 @@ export class ApiPanel {
         metaEl.textContent = `${data.status} ${data.statusText} - ${duration}ms`;
         metaEl.className = 'api-response-meta success';
 
+        // Display response body
         if (this.responseEditor) {
             const formattedBody =
                 typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
-            this.responseEditor.textContent = formattedBody;
+
+            // Detect if response is JSON
+            let isJson = false;
+            try {
+                if (typeof data.body === 'object') {
+                    isJson = true;
+                } else {
+                    JSON.parse(formattedBody);
+                    isJson = true;
+                }
+            } catch (e) {
+                isJson = false;
+            }
+
+            // Set language based on content type
+            this.monaco.editor.setModelLanguage(
+                this.responseEditor.getModel(),
+                isJson ? 'json' : 'plaintext'
+            );
+
+            this.responseEditor.setValue(formattedBody);
         }
+
+        // Display response headers
+        this.displayHeaders(data.headers || {});
+    }
+
+    displayHeaders(headers) {
+        const headersEl = document.getElementById('apiResponseHeaders');
+        if (!headersEl) return;
+
+        const headerEntries = Object.entries(headers);
+
+        if (headerEntries.length === 0) {
+            headersEl.innerHTML = '<div class="api-headers-empty">No headers</div>';
+            return;
+        }
+
+        const headersHtml = headerEntries
+            .map(
+                ([key, value]) => `
+            <div class="api-header-row">
+                <div class="api-header-key">${this.escapeHtml(key)}</div>
+                <div class="api-header-value">${this.escapeHtml(value)}</div>
+            </div>
+        `
+            )
+            .join('');
+
+        headersEl.innerHTML = headersHtml;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     showError(message) {
         if (this.responseEditor) {
-            this.responseEditor.textContent = `Error: ${message}`;
+            this.monaco.editor.setModelLanguage(this.responseEditor.getModel(), 'plaintext');
+            this.responseEditor.setValue(`Error: ${message}`);
         }
     }
 

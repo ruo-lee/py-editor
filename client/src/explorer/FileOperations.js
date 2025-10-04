@@ -191,7 +191,7 @@ export class FileOperations {
      * @param {string} sourcePath - Path to duplicate
      * @param {string} type - 'file' or 'directory'
      */
-    async duplicateItem(sourcePath, type) {
+    async duplicateItem(sourcePath, _type) {
         try {
             // Generate new name (add "- Copy" suffix)
             const pathParts = sourcePath.split('/');

@@ -21,7 +21,21 @@ body {
 .main-content {
     flex: 1;
     display: flex;
+    flex-direction: column;
     overflow: hidden;
+}
+
+/* Editor workspace (sidebar + editor area) */
+.main-content > .editor-workspace {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* Unified output panel at bottom */
+.main-content > .output-panel {
+    width: 100%;
+    border-top: 1px solid #3c3c3c;
 }
 
 /* Common utilities */

@@ -17,6 +17,13 @@
     font-weight: 400;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.header-btn,
 .theme-toggle-btn {
     background: transparent;
     border: none;
@@ -31,6 +38,7 @@
     transition: all 0.2s ease;
 }
 
+.header-btn:hover,
 .theme-toggle-btn:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #ffffff;

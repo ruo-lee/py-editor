@@ -16,6 +16,17 @@ export class LSPClient {
         this.completionResolve = null;
         this.definitionResolve = null;
         this.hoverResolve = null;
+        this.referencesResolve = null;
+
+        // Callback for when LSP is initialized
+        this.onInitialized = null;
+    }
+
+    /**
+     * Check if connected to language server
+     */
+    isConnected() {
+        return this.languageClient && this.languageClient.readyState === WebSocket.OPEN;
     }
 
     /**
@@ -140,6 +151,9 @@ export class LSPClient {
                 case 'textDocument/hover':
                     this.handleHoverResponse(response);
                     break;
+                case 'textDocument/references':
+                    this.handleReferencesResponse(response);
+                    break;
             }
         }
     }
@@ -155,6 +169,11 @@ export class LSPClient {
                 method: 'initialized',
                 params: {},
             });
+
+            // Call the initialization callback to register providers
+            if (this.onInitialized) {
+                this.onInitialized();
+            }
         }
     }
 
@@ -245,7 +264,7 @@ export class LSPClient {
         const suggestions = [];
 
         // Add snippet suggestions
-        Object.entries(this.snippets).forEach(([key, snippet]) => {
+        Object.entries(this.snippets).forEach(([_key, snippet]) => {
             suggestions.push({
                 label: snippet.prefix,
                 kind: monaco.languages.CompletionItemKind.Snippet,
@@ -421,6 +440,13 @@ export class LSPClient {
             const resolve = this.definitionResolve;
             this.definitionResolve = null;
 
+            // Check for errors in response (e.g., pylsp plugin errors)
+            if (response.error) {
+                console.warn('LSP definition error:', response.error);
+                resolve(null);
+                return;
+            }
+
             if (response.result) {
                 // Handle both array and single object results
                 const locations = Array.isArray(response.result)
@@ -444,7 +470,7 @@ export class LSPClient {
                             filePath = location.uri;
                         }
 
-                        resolve({
+                        const result = {
                             filePath: filePath,
                             range: {
                                 startLineNumber: location.range.start.line + 1,
@@ -452,7 +478,9 @@ export class LSPClient {
                                 endLineNumber: location.range.end.line + 1,
                                 endColumn: location.range.end.character + 1,
                             },
-                        });
+                        };
+
+                        resolve(result);
                         return;
                     }
                 }
@@ -467,7 +495,27 @@ export class LSPClient {
      */
     async getHover(model, position, activeFile = 'temp.py') {
         try {
-            const fileUri = this.getFileUri(activeFile);
+            // Extract file path from model URI if available
+            let filePath = activeFile;
+            if (model && model.uri) {
+                const modelUri = model.uri.toString();
+                // Extract path from URI: stdlib://path or file://path
+                if (modelUri.startsWith('stdlib://')) {
+                    filePath = modelUri.replace('stdlib://', '');
+                } else if (modelUri.startsWith('file:')) {
+                    // file:///path or file://path
+                    filePath = modelUri.replace(/^file:\/\/\/?/, '');
+                    // Remove /app/workspace/ prefix if present
+                    filePath = filePath.replace('/app/workspace/', '');
+                }
+            }
+
+            // Don't request hover for stdlib files - they are read-only and not tracked by LSP
+            if (this.isStdlibFile(filePath)) {
+                return null;
+            }
+
+            const fileUri = this.getFileUri(filePath);
 
             const hoverRequest = {
                 jsonrpc: '2.0',
@@ -532,22 +580,14 @@ export class LSPClient {
     }
 
     /**
-     * Get file URI for LSP requests
-     */
-    getFileUri(filePath) {
-        if (filePath.startsWith('/usr/local/lib/python3.11/')) {
-            // Standard library file - use absolute path
-            return `file://${filePath}`;
-        } else {
-            // Workspace file - use workspace prefix
-            return `file:///app/workspace/${filePath}`;
-        }
-    }
-
-    /**
      * Notify LSP server when file is opened
      */
     notifyDidOpen(filePath, content, languageId = 'python') {
+        // Don't notify LSP about stdlib files - they are read-only
+        if (this.isStdlibFile(filePath)) {
+            return;
+        }
+
         const fileUri = this.getFileUri(filePath);
 
         this.sendRequest({
@@ -565,9 +605,29 @@ export class LSPClient {
     }
 
     /**
+     * Check if filepath is a stdlib file (read-only)
+     */
+    isStdlibFile(filepath) {
+        if (!filepath) return false;
+        // Stdlib files start with /usr/local/lib/python or /usr/lib/python
+        return (
+            filepath.startsWith('/usr/local/lib/python') ||
+            filepath.startsWith('/usr/lib/python') ||
+            (filepath.startsWith('file://') &&
+                (filepath.includes('/usr/local/lib/python') ||
+                    filepath.includes('/usr/lib/python')))
+        );
+    }
+
+    /**
      * Notify LSP server when file is changed
      */
     notifyDidChange(filePath, content) {
+        // Don't notify LSP about stdlib files - they are read-only
+        if (this.isStdlibFile(filePath)) {
+            return;
+        }
+
         const fileUri = this.getFileUri(filePath);
 
         this.sendRequest({
@@ -587,6 +647,11 @@ export class LSPClient {
      * Notify LSP server when file is closed
      */
     notifyDidClose(filePath) {
+        // Don't notify LSP about stdlib files - they are read-only
+        if (this.isStdlibFile(filePath)) {
+            return;
+        }
+
         const fileUri = this.getFileUri(filePath);
 
         this.sendRequest({
@@ -595,6 +660,114 @@ export class LSPClient {
             params: {
                 textDocument: { uri: fileUri },
             },
+        });
+    }
+
+    /**
+     * Get file URI for LSP requests
+     * Stdlib files get their actual system paths, workspace files get /app/workspace/ prefix
+     */
+    getFileUri(filePath) {
+        if (typeof filePath !== 'string') {
+            console.warn('getFileUri received non-string filePath:', filePath);
+            return 'file:///app/workspace/temp.py';
+        }
+
+        // Stdlib files: use actual system path
+        if (this.isStdlibFile(filePath)) {
+            return `file://${filePath}`;
+        }
+
+        // Workspace files: add /app/workspace/ prefix
+        return `file:///app/workspace/${filePath}`;
+    }
+
+    /**
+     * Get completion items from LSP
+     */
+    async getCompletionItems(filePath, content, position) {
+        return new Promise((resolve) => {
+            const fileUri = this.getFileUri(filePath);
+
+            this.completionResolve = resolve;
+
+            const request = {
+                jsonrpc: '2.0',
+                id: this.messageId++,
+                method: 'textDocument/completion',
+                params: {
+                    textDocument: { uri: fileUri },
+                    position: {
+                        line: position.lineNumber - 1,
+                        character: position.column - 1,
+                    },
+                },
+            };
+
+            this.pendingRequests.set(request.id, request);
+            this.sendRequest(request);
+
+            // Timeout after 2 seconds
+            setTimeout(() => {
+                if (this.completionResolve === resolve) {
+                    this.completionResolve = null;
+                    resolve({ items: [] });
+                }
+            }, 2000);
+        });
+    }
+
+    /**
+     * Handle references response from LSP server
+     */
+    handleReferencesResponse(response) {
+        if (this.referencesResolve) {
+            const resolve = this.referencesResolve;
+            this.referencesResolve = null;
+
+            if (response.result && Array.isArray(response.result)) {
+                resolve(response.result);
+            } else {
+                resolve(null);
+            }
+        }
+    }
+
+    /**
+     * Get references from LSP
+     */
+    async getReferences(filePath, content, position, includeDeclaration = true) {
+        return new Promise((resolve) => {
+            const fileUri = this.getFileUri(filePath);
+
+            this.referencesResolve = resolve;
+
+            const request = {
+                jsonrpc: '2.0',
+                id: this.messageId++,
+                method: 'textDocument/references',
+                params: {
+                    textDocument: { uri: fileUri },
+                    position: {
+                        line: position.lineNumber - 1,
+                        character: position.column - 1,
+                    },
+                    context: {
+                        includeDeclaration: includeDeclaration,
+                    },
+                },
+            };
+
+            this.pendingRequests.set(request.id, request);
+            this.sendRequest(request);
+
+            // Timeout after 2 seconds
+            setTimeout(() => {
+                if (this.referencesResolve === resolve) {
+                    this.referencesResolve = null;
+                    resolve(null);
+                }
+            }, 2000);
         });
     }
 

@@ -25,7 +25,7 @@ export class ContextMenu {
         menu.style.left = event.pageX + 'px';
         menu.style.top = event.pageY + 'px';
 
-        const fileName = filePath.split('/').pop();
+        const _fileName = filePath.split('/').pop();
         const isDirectory = type === 'directory';
 
         let menuItems = [];

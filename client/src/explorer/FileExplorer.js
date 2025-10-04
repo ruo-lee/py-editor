@@ -14,6 +14,9 @@ export class FileExplorer {
         // State
         this.selectedDirectory = '';
         this.selectedItem = null;
+        this.selectedItems = []; // Multi-selection support
+        this.dropZoneInitialized = false;
+        this.expandedFolders = new Set(); // Track expanded folders
 
         // Callbacks
         this.onFileClick = options.onFileClick || (() => {});
@@ -24,6 +27,23 @@ export class FileExplorer {
     }
 
     /**
+     * Save currently expanded folders state
+     */
+    saveExpandedState() {
+        this.expandedFolders.clear();
+        const expandedElements = this.container.querySelectorAll('.folder-toggle.expanded');
+        expandedElements.forEach((toggle) => {
+            const folderElement = toggle.closest('.file-item[data-type="directory"]');
+            if (folderElement) {
+                const path = folderElement.getAttribute('data-path');
+                if (path) {
+                    this.expandedFolders.add(path);
+                }
+            }
+        });
+    }
+
+    /**
      * Render the file tree
      * @param {Array} files - Array of file/folder objects
      * @param {HTMLElement} container - Container element (optional, defaults to this.container)
@@ -31,8 +51,18 @@ export class FileExplorer {
      */
     render(files, container = this.container, level = 0) {
         if (level === 0) {
+            // Save expanded state before clearing
+            this.saveExpandedState();
+
             container.innerHTML = '';
-            this.setupExplorerDropZone(container);
+            // Setup drop zone on the workspace content area (entire panel) - only once
+            if (!this.dropZoneInitialized) {
+                const workspaceContent = document.getElementById('workspaceContent');
+                if (workspaceContent) {
+                    this.setupExplorerDropZone(workspaceContent);
+                    this.dropZoneInitialized = true;
+                }
+            }
         }
 
         files.forEach((item) => {
@@ -76,12 +106,14 @@ export class FileExplorer {
             if (!isExpanded) {
                 content.classList.add('expanded');
                 toggle.classList.add('expanded');
+                this.expandedFolders.add(item.path); // Track expansion
                 if (content.children.length === 0) {
                     this.render(item.children, content, level + 1);
                 }
             } else {
                 content.classList.remove('expanded');
                 toggle.classList.remove('expanded');
+                this.expandedFolders.delete(item.path); // Track collapse
             }
         });
 
@@ -90,10 +122,19 @@ export class FileExplorer {
             if (e.target === toggle) return; // Don't select when clicking toggle
             e.stopPropagation();
 
-            this.clearSelection();
-            element.classList.add('selected');
-            this.selectedDirectory = item.path;
-            this.selectedItem = { path: item.path, type: 'directory' };
+            // Focus the file explorer to enable keyboard shortcuts
+            this.container.focus();
+
+            // Multi-selection with Cmd/Ctrl key
+            if (e.metaKey || e.ctrlKey) {
+                this.toggleSelection(element, item, 'directory');
+            } else {
+                this.clearSelection();
+                element.classList.add('selected');
+                this.selectedDirectory = item.path;
+                this.selectedItem = { path: item.path, name: item.name, type: 'directory' };
+                this.selectedItems = [{ path: item.path, name: item.name, type: 'directory' }];
+            }
 
             this.onFolderClick(item.path);
         });
@@ -110,6 +151,16 @@ export class FileExplorer {
 
         container.appendChild(element);
         container.appendChild(content);
+
+        // Restore expanded state if this folder was previously expanded
+        if (this.expandedFolders.has(item.path)) {
+            content.classList.add('expanded');
+            toggle.classList.add('expanded');
+            // Render children if not already rendered
+            if (content.children.length === 0 && item.children) {
+                this.render(item.children, content, level + 1);
+            }
+        }
     }
 
     /**
@@ -128,11 +179,21 @@ export class FileExplorer {
         element.addEventListener('click', (e) => {
             e.stopPropagation();
 
-            this.clearSelection();
-            element.classList.add('selected');
-            this.selectedItem = { path: item.path, type: 'file' };
+            // Focus the file explorer to enable keyboard shortcuts
+            this.container.focus();
 
-            this.onFileClick(item.path);
+            // Multi-selection with Cmd/Ctrl key
+            if (e.metaKey || e.ctrlKey) {
+                this.toggleSelection(element, item, 'file');
+            } else {
+                this.clearSelection();
+                element.classList.add('selected');
+                this.selectedItem = { path: item.path, name: item.name, type: 'file' };
+                this.selectedItems = [{ path: item.path, name: item.name, type: 'file' }];
+
+                // Open file but keep focus on explorer for keyboard shortcuts
+                this.onFileClick(item.path);
+            }
         });
 
         // Right-click context menu
@@ -154,54 +215,112 @@ export class FileExplorer {
         document.querySelectorAll('.file-item.selected').forEach((el) => {
             el.classList.remove('selected');
         });
+        this.selectedItems = [];
     }
 
     /**
-     * Setup drop zone for the entire explorer (for external file uploads)
+     * Toggle selection for multi-select with Cmd/Ctrl
+     */
+    toggleSelection(element, item, type) {
+        const itemData = { path: item.path, name: item.name, type: type };
+        const existingIndex = this.selectedItems.findIndex(
+            (selectedItem) => selectedItem.path === item.path
+        );
+
+        if (existingIndex >= 0) {
+            // Deselect
+            element.classList.remove('selected');
+            this.selectedItems.splice(existingIndex, 1);
+        } else {
+            // Select
+            element.classList.add('selected');
+            this.selectedItems.push(itemData);
+        }
+
+        // Update selectedItem to the last selected item
+        if (this.selectedItems.length > 0) {
+            this.selectedItem = this.selectedItems[this.selectedItems.length - 1];
+        } else {
+            this.selectedItem = null;
+        }
+    }
+
+    /**
+     * Setup drop zone for the entire explorer (for external file uploads and root moves)
      */
     setupExplorerDropZone(container) {
         container.addEventListener('dragover', (e) => {
-            // Only allow external files
-            if (e.dataTransfer.types.includes('Files')) {
+            const hasInternalDrag = e.dataTransfer.types.includes('application/json');
+            const hasExternalFiles = e.dataTransfer.types.includes('Files');
+
+            // Allow both internal drags (move to root) and external files
+            if (hasInternalDrag || hasExternalFiles) {
                 e.preventDefault();
-                e.dataTransfer.dropEffect = 'copy';
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = hasInternalDrag ? 'move' : 'copy';
                 container.classList.add('drag-over');
             }
         });
 
         container.addEventListener('dragleave', (e) => {
-            if (e.target === container) {
+            // Check if we're leaving the container bounds (not just moving to a child)
+            const rect = container.getBoundingClientRect();
+            if (
+                e.clientX < rect.left ||
+                e.clientX >= rect.right ||
+                e.clientY < rect.top ||
+                e.clientY >= rect.bottom
+            ) {
                 container.classList.remove('drag-over');
             }
         });
 
         container.addEventListener('drop', async (e) => {
             e.preventDefault();
+            e.stopPropagation();
             container.classList.remove('drag-over');
 
-            // External file/directory upload
-            const items = e.dataTransfer.items;
+            // Internal file/folder move to root
+            if (e.dataTransfer.types.includes('application/json')) {
+                const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                // Check if multiple items are being moved
+                if (data.isMultiple && data.items) {
+                    // Move multiple items to root
+                    for (const draggedItem of data.items) {
+                        this.onFileMove(draggedItem, '');
+                    }
+                } else {
+                    // Move single item to root (empty string path)
+                    this.onFileMove(data, '');
+                }
+                return;
+            }
 
-            if (items && items.length > 0) {
-                // Check if we can use the items API
-                let hasEntry = false;
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].webkitGetAsEntry) {
-                        hasEntry = true;
-                        break;
+            // External file/directory upload
+            if (e.dataTransfer.types.includes('Files')) {
+                const items = e.dataTransfer.items;
+
+                if (items && items.length > 0) {
+                    // Check if we can use the items API
+                    let hasEntry = false;
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].webkitGetAsEntry) {
+                            hasEntry = true;
+                            break;
+                        }
+                    }
+
+                    if (hasEntry) {
+                        this.onExternalFileDrop(items, '', 'items');
+                        return;
                     }
                 }
 
-                if (hasEntry) {
-                    this.onExternalFileDrop(items, '', 'items');
-                    return;
+                // Fallback for browsers that don't support items API
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.onExternalFileDrop(files, '', 'files');
                 }
-            }
-
-            // Fallback for browsers that don't support items API
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                this.onExternalFileDrop(files, '', 'files');
             }
         });
     }
@@ -212,18 +331,33 @@ export class FileExplorer {
     setupDragEvents(element, item) {
         element.addEventListener('dragstart', (e) => {
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData(
-                'application/json',
-                JSON.stringify({
-                    path: item.path,
-                    name: item.name,
-                    type: item.type,
-                })
-            );
+
+            // Check if dragging multiple items
+            if (this.selectedItems.length > 1) {
+                // Dragging multiple items
+                e.dataTransfer.setData(
+                    'application/json',
+                    JSON.stringify({
+                        items: this.selectedItems,
+                        isMultiple: true,
+                    })
+                );
+            } else {
+                // Dragging single item
+                e.dataTransfer.setData(
+                    'application/json',
+                    JSON.stringify({
+                        path: item.path,
+                        name: item.name,
+                        type: item.type,
+                    })
+                );
+            }
+
             element.classList.add('dragging');
         });
 
-        element.addEventListener('dragend', (e) => {
+        element.addEventListener('dragend', (_e) => {
             element.classList.remove('dragging');
             document.querySelectorAll('.drag-over').forEach((el) => {
                 el.classList.remove('drag-over');
@@ -264,7 +398,17 @@ export class FileExplorer {
             // Internal file/folder move
             if (e.dataTransfer.types.includes('application/json')) {
                 const data = JSON.parse(e.dataTransfer.getData('application/json'));
-                if (data.path !== item.path) {
+
+                // Check if multiple items are being moved
+                if (data.isMultiple && data.items) {
+                    // Move multiple items
+                    for (const draggedItem of data.items) {
+                        if (draggedItem.path !== item.path) {
+                            this.onFileMove(draggedItem, item.path);
+                        }
+                    }
+                } else if (data.path !== item.path) {
+                    // Move single item
                     this.onFileMove(data, item.path);
                 }
                 return;
@@ -346,6 +490,34 @@ export class FileExplorer {
     }
 
     /**
+     * Get all currently expanded folder paths
+     */
+    getExpandedFolders() {
+        const expandedPaths = [];
+        this.container.querySelectorAll('.folder-content.expanded').forEach((content) => {
+            const folderElement = content.previousElementSibling;
+            if (folderElement) {
+                const path = folderElement.getAttribute('data-path');
+                if (path) {
+                    expandedPaths.push(path);
+                }
+            }
+        });
+        return expandedPaths;
+    }
+
+    /**
+     * Restore expanded folder states
+     */
+    restoreExpandedFolders(paths) {
+        if (!paths || paths.length === 0) return;
+
+        paths.forEach((path) => {
+            this.expandFolder(path);
+        });
+    }
+
+    /**
      * Expand a folder by path
      */
     expandFolder(path) {
@@ -386,5 +558,21 @@ export class FileExplorer {
         this.container.innerHTML = '';
         this.selectedDirectory = '';
         this.selectedItem = null;
+    }
+
+    /**
+     * Restore selection for a directory after refresh
+     */
+    restoreSelection(path) {
+        const selectedElement = this.container.querySelector(
+            `[data-path="${path}"][data-type="directory"]`
+        );
+        if (selectedElement) {
+            selectedElement.classList.add('selected');
+            this.selectedDirectory = path;
+            this.selectedItem = { path, type: 'directory' };
+            return true;
+        }
+        return false;
     }
 }

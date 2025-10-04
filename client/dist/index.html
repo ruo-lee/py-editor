@@ -1,24 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>self["MonacoEnvironment"] = (function (paths) {
+          return {
+            globalAPI: false,
+            getWorkerUrl : function (moduleId, label) {
+              var result =  paths[label];
+              if (/^((http:)|(https:)|(file:)|(\/\/))/.test(result)) {
+                var currentUrl = String(window.location);
+                var currentOrigin = currentUrl.substr(0, currentUrl.length - window.location.hash.length - window.location.search.length - window.location.pathname.length);
+                if (result.substring(0, currentOrigin.length) !== currentOrigin) {
+                  var js = '/*' + label + '*/importScripts("' + result + '");';
+                  var blob = new Blob([js], { type: 'application/javascript' });
+                  return URL.createObjectURL(blob);
+                }
+              }
+              return result;
+            }
+          };
+        })({
+  "editorWorkerService": "/monacoeditorwork/editor.worker.bundle.js",
+  "json": "/monacoeditorwork/json.worker.bundle.js",
+  "css": "/monacoeditorwork/css.worker.bundle.js",
+  "html": "/monacoeditorwork/html.worker.bundle.js",
+  "typescript": "/monacoeditorwork/ts.worker.bundle.js",
+  "javascript": "/monacoeditorwork/ts.worker.bundle.js",
+  "less": "/monacoeditorwork/css.worker.bundle.js",
+  "scss": "/monacoeditorwork/css.worker.bundle.js",
+  "handlebars": "/monacoeditorwork/html.worker.bundle.js",
+  "razor": "/monacoeditorwork/html.worker.bundle.js"
+});</script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python IDE</title>
-  <script type="module" crossorigin src="/assets/index-80b6e5ec.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/monaco-editor-470b0737.js">
+  <script type="module" crossorigin src="/assets/index-1108c48f.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/monaco-editor-4fbb514b.js">
   <link rel="stylesheet" href="/assets/monaco-editor-39af074f.css">
-  <link rel="stylesheet" href="/assets/index-79f74e13.css">
+  <link rel="stylesheet" href="/assets/index-95112887.css">
 </head>
 <body>
     <div id="app">
         <div class="header">
             <span class="app-title">PyEditor</span>
-            <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
-                <i class="codicon codicon-color-mode"></i>
-            </button>
+            <div class="header-actions">
+                <button class="header-btn" id="apiToggleBtn" title="API Request">
+                    <i class="codicon codicon-globe"></i>
+                </button>
+                <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">
+                    <i class="codicon codicon-color-mode"></i>
+                </button>
+            </div>
         </div>
         <div class="main-content">
-            <div class="sidebar" id="sidebar">
+            <div class="editor-workspace">
+                <div class="sidebar" id="sidebar">
                 <div class="explorer-header">
                     <div class="explorer-title">Explorer</div>
                     <button class="action-button" id="toggleHiddenBtn" title="Toggle Hidden Files">
@@ -46,23 +82,21 @@
                     </div>
                 </div>
                 <div class="workspace-content" id="workspaceContent">
-                    <div class="file-explorer" id="fileExplorer">
+                    <div class="file-explorer" id="fileExplorer" tabindex="0">
                         <div class="loading">Loading files...</div>
                     </div>
                 </div>
                 <div class="sidebar-resizer" id="sidebarResizer"></div>
             </div>
             <div class="editor-area" id="editorArea">
-                <div class="editor-group" id="editorGroup1">
+                <div class="editor-group">
                     <div class="tab-bar" id="tabBar">
+                        <div class="tab-bar-tabs"></div>
                         <div class="tab-bar-actions">
                             <button class="execute-btn" id="executeButton" title="Run Code (Ctrl+R)" style="display: none;">
                                 <i class="codicon codicon-play"></i>
                             </button>
-                            <button class="split-toggle-btn" id="apiToggleBtn" title="API Request">
-                                <i class="codicon codicon-globe"></i>
-                            </button>
-                            <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor">
+                            <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor" style="display: none;">
                                 <i class="codicon codicon-split-horizontal"></i>
                             </button>
                         </div>
@@ -71,17 +105,18 @@
                     <div class="editor-container">
                         <div id="editor"></div>
                     </div>
-                    <div class="output-panel" id="outputPanel" style="display: none;">
-                        <div class="output-panel-resizer" id="outputPanelResizer"></div>
-                        <div class="output-panel-header">
-                            <div class="output-panel-title">Output</div>
-                            <button class="output-panel-close" id="outputPanelClose" title="Close Output">
-                                <i class="codicon codicon-close"></i>
-                            </button>
-                        </div>
-                        <div class="output-panel-content" id="outputPanelContent"></div>
-                    </div>
                 </div>
+            </div>
+            </div>
+            <div class="output-panel" id="outputPanel" style="display: none;">
+                <div class="output-panel-resizer" id="outputPanelResizer"></div>
+                <div class="output-panel-header">
+                    <div class="output-panel-title">Output</div>
+                    <button class="output-panel-close" id="outputPanelClose" title="Close Output">
+                        <i class="codicon codicon-close"></i>
+                    </button>
+                </div>
+                <div class="output-panel-content" id="outputPanelContent"></div>
             </div>
         </div>
     </div>

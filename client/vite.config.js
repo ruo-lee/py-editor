@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 
 export default defineConfig({
     base: '/',
@@ -9,6 +10,11 @@ export default defineConfig({
             '/workspace': 'http://localhost:8080',
         },
     },
+    plugins: [
+        (monacoEditorPlugin.default || monacoEditorPlugin)({
+            languageWorkers: ['editorWorkerService', 'json', 'css', 'html', 'typescript'],
+        }),
+    ],
     build: {
         outDir: 'dist',
         assetsDir: 'assets',
