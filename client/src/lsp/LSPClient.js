@@ -678,7 +678,9 @@ export class LSPClient {
         }
 
         // Workspace files: add /app/workspace/ prefix
-        return `file:///app/workspace/${filePath}`;
+        // Remove leading slash to avoid double slashes
+        const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+        return `file:///app/workspace/${normalizedPath}`;
     }
 
     /**

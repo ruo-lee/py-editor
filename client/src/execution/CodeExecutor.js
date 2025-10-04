@@ -50,12 +50,16 @@ export class CodeExecutor {
             const result = await response.json();
 
             if (outputPanelContent) {
-                if (result.success) {
+                // exitCode 0 means success
+                if (result.exitCode === 0) {
+                    outputPanelContent.className = 'output-panel-content';
                     outputPanelContent.textContent =
                         result.output || 'Code executed successfully (no output)';
                 } else {
                     outputPanelContent.className = 'output-panel-content error';
-                    outputPanelContent.textContent = result.error || 'Execution failed';
+                    // Show stderr if available, otherwise show output
+                    outputPanelContent.textContent =
+                        result.error || result.output || 'Execution failed';
                 }
             }
         } catch (error) {

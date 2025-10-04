@@ -228,7 +228,9 @@ export class LSPManager {
         }
 
         // Workspace file - send didChange
-        const fileUri = `file:///app/workspace/${filePath}`;
+        // Remove leading slash to avoid double slashes
+        const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+        const fileUri = `file:///app/workspace/${normalizedPath}`;
         this.context.sendLSPRequest({
             jsonrpc: '2.0',
             method: 'textDocument/didChange',
