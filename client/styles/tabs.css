@@ -1,0 +1,211 @@
+/* Tab bar and tab styles */
+.tab-bar {
+    height: 35px;
+    background: #2d2d30;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden; /* Hide overflow to enable fade effect */
+}
+
+.tab-bar.drag-over {
+    background: rgba(0, 122, 204, 0.1);
+}
+
+/* Scrollable tab container */
+.tab-bar-tabs {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    position: relative;
+    /* Add padding-right to prevent tabs from going under actions */
+    padding-right: 120px;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    /* Background color matching tab-bar */
+    background: #2d2d30;
+    /* Mask gradient for fade effect that moves with scroll */
+    mask-image: linear-gradient(to right,
+        black calc(100% - 120px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(to right,
+        black calc(100% - 120px),
+        transparent 100%
+    );
+}
+
+/* Hide scrollbar for Chrome/Safari */
+.tab-bar-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.tab-bar-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    z-index: 15; /* Higher than fade overlay */
+    background: #2d2d30; /* Solid background */
+    padding-left: 12px; /* Extra padding for fade transition */
+}
+
+.execute-btn,
+.split-toggle-btn {
+    background: transparent;
+    border: none;
+    color: #cccccc;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+}
+
+.execute-btn:hover,
+.split-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.execute-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tab {
+    height: 35px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #2d2d30;
+    border-right: 1px solid #252526;
+    cursor: pointer;
+    font-size: 13px;
+    position: relative;
+    transition: background-color 0.1s;
+    user-select: none;
+}
+
+.tab.active {
+    background: #1e1e1e;
+    border-bottom: 2px solid #007acc;
+}
+
+.tab:hover {
+    background: #2a2d2e;
+}
+
+.tab.dragging {
+    opacity: 0.5;
+    cursor: move;
+}
+
+.tab.stdlib-tab {
+    background: #2d2d2d;
+    color: #cccccc;
+    font-style: italic;
+}
+
+.tab.stdlib-tab:hover {
+    background: #3a3a3a;
+}
+
+.tab-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    opacity: 0;
+    transition: all 0.1s;
+    flex-shrink: 0;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+    opacity: 0.6;
+}
+
+.tab-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 1 !important;
+}
+
+/* Light theme overrides */
+body.light-theme .tab-bar {
+    background: #f3f3f3;
+    border-bottom: 1px solid #d4d4d4;
+}
+
+body.light-theme .tab-bar.drag-over {
+    background: rgba(0, 122, 204, 0.15);
+}
+
+body.light-theme .tab-bar-tabs {
+    background: #f3f3f3;
+}
+
+body.light-theme .tab-bar-actions {
+    background: #f3f3f3;
+}
+
+body.light-theme .tab {
+    background: #f3f3f3;
+    border-right: 1px solid #e5e5e5;
+    color: #333333;
+}
+
+body.light-theme .tab.active {
+    background: #ffffff;
+    border-bottom: 2px solid #007acc;
+}
+
+body.light-theme .tab:hover {
+    background: #e8e8e8;
+}
+
+body.light-theme .tab.stdlib-tab {
+    background: #e8e8e8;
+    color: #666666;
+}
+
+body.light-theme .tab.stdlib-tab:hover {
+    background: #d4d4d4;
+}
+
+body.light-theme .execute-btn,
+body.light-theme .split-toggle-btn {
+    color: #424242;
+}
+
+body.light-theme .execute-btn:hover,
+body.light-theme .split-toggle-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000000;
+}
+
+body.light-theme .tab-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
