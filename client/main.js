@@ -41,6 +41,7 @@ import './styles/editor.css';
 import './styles/tabs.css';
 import './styles/output.css';
 import './styles/api-panel.css';
+import './styles/welcome.css';
 import './styles/components/dialogs.css';
 import './styles/components/context-menu.css';
 import './styles/themes/light.css';

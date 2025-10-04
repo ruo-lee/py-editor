@@ -4,38 +4,81 @@
  */
 
 /**
- * Welcome message displayed when editor first loads
+ * Welcome page HTML content
  */
-export const WELCOME_MESSAGE = `"""
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                                                                           ║
-║     ██████╗ ██╗   ██╗       ███████╗██████╗ ██╗████████╗ ██████╗ ██████╗
-║     ██╔══██╗╚██╗ ██╔╝       ██╔════╝██╔══██╗██║╚══██╔══╝██╔═══██╗██╔══██╗
-║     ██████╔╝ ╚████╔╝  ████╗ █████╗  ██║  ██║██║   ██║   ██║   ██║██████╔╝
-║     ██╔═══╝   ╚██╔╝   ╚═══╝ ██╔══╝  ██║  ██║██║   ██║   ██║   ██║██╔══██╗
-║     ██║        ██║          ███████╗██████╔╝██║   ██║   ╚██████╔╝██║  ██║
-║     ╚═╝        ╚═╝          ╚══════╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
-║                                                                           ║
-║         Welcome to PY-EDITOR - Python Development Environment            ║
-║                                                                           ║
-╚═══════════════════════════════════════════════════════════════════════════╝
+export const WELCOME_HTML = `
+<div class="welcome-page">
+    <div class="welcome-container">
+        <div class="welcome-header">
+            <div class="welcome-logo">
+                <i class="codicon codicon-code welcome-logo-icon"></i>
+                <div class="welcome-logo-text">PyEditor</div>
+            </div>
+            <div class="welcome-subtitle">Python Development Environment</div>
+        </div>
 
-🚀 Quick Start:
-   • Create a new file: Click the + icon in Explorer
-   • Open existing file: Click any .py file in Explorer
-   • Run your code: Click the Run button or press Ctrl+R (Cmd+R on Mac)
-   • Save your work: Press Ctrl+S (Cmd+S on Mac)
+        <div class="welcome-section">
+            <div class="welcome-section-title">
+                <i class="codicon codicon-rocket welcome-section-icon"></i>
+                Start
+            </div>
+            <div class="welcome-actions">
+                <button class="welcome-action-btn" id="welcomeNewFile">
+                    <i class="codicon codicon-new-file welcome-action-icon"></i>
+                    <div class="welcome-action-content">
+                        <div class="welcome-action-title">New File</div>
+                        <div class="welcome-action-desc">Create a new Python file</div>
+                    </div>
+                </button>
+                <button class="welcome-action-btn" id="welcomeApiRequest">
+                    <i class="codicon codicon-globe welcome-action-icon"></i>
+                    <div class="welcome-action-content">
+                        <div class="welcome-action-title">API Request</div>
+                        <div class="welcome-action-desc">Test APIs with built-in client</div>
+                    </div>
+                </button>
+            </div>
+        </div>
 
-💡 Tips:
-   • Use split view: Click the split icon to edit multiple files
-   • Delete files: Select a file and press Delete (Cmd+Backspace on Mac)
-   • Switch themes: Click the theme toggle button in the top-right corner
-   • Auto-completion: Start typing to see intelligent suggestions
-
-📝 Start coding by opening a file from the Explorer!
-
-Note: This is a read-only welcome screen. Open or create a file to start editing.
-"""`;
+        <div class="welcome-section">
+            <div class="welcome-section-title">
+                <i class="codicon codicon-lightbulb welcome-section-icon"></i>
+                Tips
+            </div>
+            <div class="welcome-tips">
+                <div class="welcome-tip">
+                    <i class="codicon codicon-play welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Run Code</div>
+                        <div class="welcome-tip-desc">Press <span class="welcome-keyboard">Ctrl+R</span> or click the Run button to execute your Python code</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
+                    <i class="codicon codicon-split-horizontal welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Split View</div>
+                        <div class="welcome-tip-desc">Edit multiple files side by side with the split editor feature</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
+                    <i class="codicon codicon-color-mode welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Switch Theme</div>
+                        <div class="welcome-tip-desc">Toggle between dark and light themes using the button in the top-right corner</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
+                    <i class="codicon codicon-symbol-method welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Code Intelligence</div>
+                        <div class="welcome-tip-desc">Enjoy auto-completion, hover info, and go-to-definition with LSP support</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+`;
 
 /**
  * Default Monaco Editor options
@@ -45,7 +88,7 @@ Note: This is a read-only welcome screen. Open or create a file to start editing
  */
 export function getDefaultEditorOptions(theme = 'vs-dark', readOnly = false) {
     return {
-        value: readOnly ? WELCOME_MESSAGE : '',
+        value: '',
         language: 'python',
         theme: theme,
         fontSize: 14,

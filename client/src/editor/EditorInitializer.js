@@ -3,6 +3,7 @@ import {
     configureTypeScriptDefaults,
     registerPythonLanguage,
     getDefaultEditorOptions,
+    WELCOME_HTML,
 } from '../config/editorConfig.js';
 
 /**
@@ -21,11 +22,14 @@ export class EditorInitializer {
         registerPythonLanguage(monaco);
 
         // Create editor with default options
-        const editorOptions = getDefaultEditorOptions(this.context.currentTheme, true);
+        const editorOptions = getDefaultEditorOptions(this.context.currentTheme, false);
         this.context.editor = monaco.editor.create(
             document.getElementById('editor'),
             editorOptions
         );
+
+        // Show welcome page
+        this.showWelcomePage();
 
         this.setupEditorEventHandlers();
         this.setupKeyboardTracking();
@@ -36,6 +40,58 @@ export class EditorInitializer {
 
         // Initialize syntax checking debounce
         this.context.syntaxCheckTimeout = null;
+    }
+
+    showWelcomePage() {
+        const editorContainer = document.getElementById('editor');
+        if (editorContainer) {
+            // Hide Monaco editor
+            this.context.editor.getDomNode().style.display = 'none';
+
+            // Create welcome page element
+            const welcomePage = document.createElement('div');
+            welcomePage.id = 'welcomePage';
+            welcomePage.innerHTML = WELCOME_HTML;
+            editorContainer.parentElement.appendChild(welcomePage);
+
+            // Setup welcome page event listeners
+            this.setupWelcomePageEvents();
+        }
+    }
+
+    hideWelcomePage() {
+        const welcomePage = document.getElementById('welcomePage');
+        if (welcomePage) {
+            welcomePage.remove();
+        }
+        // Show Monaco editor
+        if (this.context.editor) {
+            this.context.editor.getDomNode().style.display = 'block';
+        }
+    }
+
+    setupWelcomePageEvents() {
+        // New File button
+        const newFileBtn = document.getElementById('welcomeNewFile');
+        if (newFileBtn) {
+            newFileBtn.addEventListener('click', () => {
+                const newFileBtn = document.getElementById('newFileBtn');
+                if (newFileBtn) {
+                    newFileBtn.click();
+                }
+            });
+        }
+
+        // API Request button
+        const apiRequestBtn = document.getElementById('welcomeApiRequest');
+        if (apiRequestBtn) {
+            apiRequestBtn.addEventListener('click', () => {
+                const apiToggleBtn = document.getElementById('apiToggleBtn');
+                if (apiToggleBtn) {
+                    apiToggleBtn.click();
+                }
+            });
+        }
     }
 
     setupEditorEventHandlers() {

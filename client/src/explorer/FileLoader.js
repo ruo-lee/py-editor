@@ -11,6 +11,11 @@ export class FileLoader {
 
     async openFile(filepath, targetEditor = 'left') {
         try {
+            // Hide welcome page if showing
+            if (this.context.editorInitializer) {
+                this.context.editorInitializer.hideWelcomePage();
+            }
+
             // Check if file is already open in either editor
             const existingInLeft = this.context.openTabs.has(filepath);
             const existingInRight =
