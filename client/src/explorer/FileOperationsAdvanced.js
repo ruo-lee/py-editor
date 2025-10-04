@@ -6,6 +6,10 @@ import * as monaco from 'monaco-editor';
 export class FileOperationsAdvanced {
     constructor(context) {
         this.context = context;
+
+        // Cache for file existence checks
+        this.fileExistsCache = new Map();
+        this.cacheTimeout = 3000; // 3 seconds cache
     }
 
     async duplicateItem(filePath, type) {
@@ -170,12 +174,31 @@ export class FileOperationsAdvanced {
     }
 
     async fileExists(filePath) {
+        // Check cache first
+        const cached = this.fileExistsCache.get(filePath);
+        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+            return cached.exists;
+        }
+
         try {
             const response = await fetch(this.context.buildUrl(`/api/files/${filePath}`), {
                 headers: this.context.getFetchHeaders(),
             });
-            return response.ok;
+            const exists = response.ok;
+
+            // Cache the result
+            this.fileExistsCache.set(filePath, {
+                exists,
+                timestamp: Date.now(),
+            });
+
+            return exists;
         } catch {
+            // Cache negative result
+            this.fileExistsCache.set(filePath, {
+                exists: false,
+                timestamp: Date.now(),
+            });
             return false;
         }
     }

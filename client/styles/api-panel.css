@@ -60,6 +60,10 @@
     max-height: 50%;
 }
 
+body.light-theme .api-request-section {
+    border-bottom-color: #e5e5e5;
+}
+
 .api-response-section {
     flex: 1;
     display: flex;
@@ -75,6 +79,10 @@
     border: 1px solid #3e3e42;
     border-radius: 4px;
     overflow: hidden;
+}
+
+body.light-theme .api-body-editor {
+    border-color: #e5e5e5;
 }
 
 .api-response-editor {
@@ -155,12 +163,24 @@
     justify-content: center;
 }
 
+body.light-theme .api-response-action {
+    color: #333333;
+}
+
 .api-response-action:hover {
     background: #3e3e42;
 }
 
+body.light-theme .api-response-action:hover {
+    background: #e8e8e8;
+}
+
 .api-response-action:active {
     background: #505050;
+}
+
+body.light-theme .api-response-action:active {
+    background: #d4d4d4;
 }
 
 /* Response tabs */
@@ -361,6 +381,10 @@ body.light-theme .api-header-value {
     border-bottom: 1px solid #3e3e42;
 }
 
+body.light-theme .api-tabs {
+    border-bottom-color: #e5e5e5;
+}
+
 .api-tab {
     background: transparent;
     border: none;
@@ -370,9 +394,18 @@ body.light-theme .api-header-value {
     border-bottom: 2px solid transparent;
 }
 
+body.light-theme .api-tab {
+    color: #333333;
+}
+
 .api-tab.active {
     border-bottom-color: #007acc;
     color: #ffffff;
+}
+
+body.light-theme .api-tab.active {
+    border-bottom-color: #007acc;
+    color: #005a9e;
 }
 
 .api-tab-panel {

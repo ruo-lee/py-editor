@@ -191,6 +191,11 @@ export class ApiPanel {
         // Close panel
         document.getElementById('apiPanelClose').addEventListener('click', () => {
             this.hide();
+            // Update toggle button state
+            const apiToggleBtn = document.getElementById('apiToggleBtn');
+            if (apiToggleBtn) {
+                apiToggleBtn.classList.remove('active');
+            }
         });
 
         // Tab switching
@@ -643,6 +648,17 @@ export class ApiPanel {
         const panel = document.getElementById('apiPanel');
         if (panel) {
             panel.classList.remove('show');
+        }
+    }
+
+    toggle() {
+        const panel = document.getElementById('apiPanel');
+        if (panel) {
+            if (panel.classList.contains('show')) {
+                this.hide();
+            } else {
+                this.show();
+            }
         }
     }
 

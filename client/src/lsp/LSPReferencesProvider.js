@@ -183,10 +183,37 @@ export class LSPReferencesProvider {
                 return lineContent.trim();
             }
 
-            // For unopened files, we could fetch content, but for performance
-            // we'll just return a placeholder
+            // For unopened files, fetch the file content to get the preview
+            const workspaceFolder = this.context.workspaceFolder;
+            const url = `/api/files/${filePath}${workspaceFolder ? `?folder=${workspaceFolder}` : ''}`;
+            const fullUrl = this.context.buildUrl(url);
+
+            const response = await fetch(fullUrl, {
+                headers: this.context.getFetchHeaders(),
+            });
+
+            if (!response.ok) {
+                // File not found or error - use placeholder
+                // eslint-disable-next-line no-console
+                console.warn(`[Preview] Failed to fetch ${filePath}: ${response.status}`);
+                return `Line ${lineNumber + 1}`;
+            }
+
+            const data = await response.json();
+            const content = data.content || '';
+            const lines = content.split('\n');
+
+            // lineNumber is 0-based, so use it directly as array index
+            if (lineNumber >= 0 && lineNumber < lines.length) {
+                const preview = lines[lineNumber].trim();
+                // Return the preview if it has content, otherwise use placeholder
+                return preview || `Line ${lineNumber + 1}`;
+            }
             return `Line ${lineNumber + 1}`;
         } catch (error) {
+            // Network error or other issue - use placeholder
+            // eslint-disable-next-line no-console
+            console.error(`[Preview] Error fetching ${filePath}:`, error);
             return `Line ${lineNumber + 1}`;
         }
     }

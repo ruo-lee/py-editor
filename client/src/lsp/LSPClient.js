@@ -192,14 +192,18 @@ export class LSPClient {
         // Go-to-definition
         monaco.languages.registerDefinitionProvider('python', {
             provideDefinition: async (model, position) => {
-                return this.getDefinition(model, position);
+                const filePath = this.activeFile || 'temp.py';
+                const content = model.getValue();
+                return this.getDefinition(filePath, content, position);
             },
         });
 
         // Hover information
         monaco.languages.registerHoverProvider('python', {
             provideHover: async (model, position) => {
-                return this.getHover(model, position);
+                const filePath = this.activeFile || 'temp.py';
+                const content = model.getValue();
+                return this.getHover(filePath, content, position);
             },
         });
     }
@@ -371,12 +375,12 @@ export class LSPClient {
     /**
      * Get definition location from LSP server
      */
-    async getDefinition(model, position, activeFile = 'temp.py') {
+    async getDefinition(filePath, content, position) {
         try {
-            const fileUri = this.getFileUri(activeFile);
+            const fileUri = this.getFileUri(filePath);
 
             // Ensure document is synchronized before requesting definition
-            await this.ensureDocumentSynchronized(activeFile, model.getValue());
+            await this.ensureDocumentSynchronized(filePath, content);
 
             const requestId = this.messageId++;
             const definitionRequest = {
@@ -413,6 +417,11 @@ export class LSPClient {
      * Ensure document is synchronized with LSP server
      */
     async ensureDocumentSynchronized(filePath, content) {
+        // Don't synchronize stdlib files - they are read-only and not tracked by LSP
+        if (this.isStdlibFile(filePath)) {
+            return;
+        }
+
         const fileUri = this.getFileUri(filePath);
 
         // Send didChange to ensure document is up to date
@@ -493,23 +502,8 @@ export class LSPClient {
     /**
      * Get hover information from LSP server
      */
-    async getHover(model, position, activeFile = 'temp.py') {
+    async getHover(filePath, content, position) {
         try {
-            // Extract file path from model URI if available
-            let filePath = activeFile;
-            if (model && model.uri) {
-                const modelUri = model.uri.toString();
-                // Extract path from URI: stdlib://path or file://path
-                if (modelUri.startsWith('stdlib://')) {
-                    filePath = modelUri.replace('stdlib://', '');
-                } else if (modelUri.startsWith('file:')) {
-                    // file:///path or file://path
-                    filePath = modelUri.replace(/^file:\/\/\/?/, '');
-                    // Remove /app/workspace/ prefix if present
-                    filePath = filePath.replace('/app/workspace/', '');
-                }
-            }
-
             // Don't request hover for stdlib files - they are read-only and not tracked by LSP
             if (this.isStdlibFile(filePath)) {
                 return null;
@@ -609,13 +603,18 @@ export class LSPClient {
      */
     isStdlibFile(filepath) {
         if (!filepath) return false;
-        // Stdlib files start with /usr/local/lib/python or /usr/lib/python
+
+        // Remove file:// prefix if present
+        const cleanPath = filepath.startsWith('file://')
+            ? filepath.replace('file://', '')
+            : filepath;
+
+        // Stdlib files and site-packages are read-only
         return (
-            filepath.startsWith('/usr/local/lib/python') ||
-            filepath.startsWith('/usr/lib/python') ||
-            (filepath.startsWith('file://') &&
-                (filepath.includes('/usr/local/lib/python') ||
-                    filepath.includes('/usr/lib/python')))
+            cleanPath.startsWith('/usr/local/lib/python') ||
+            cleanPath.startsWith('/usr/lib/python') ||
+            cleanPath.includes('/site-packages/') ||
+            cleanPath.includes('/dist-packages/')
         );
     }
 

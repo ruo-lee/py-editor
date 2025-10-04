@@ -58,7 +58,10 @@ export class WorkspaceManager {
         const apiToggleBtn = document.getElementById('apiToggleBtn');
         if (apiToggleBtn) {
             apiToggleBtn.addEventListener('click', () => {
-                this.context.apiPanel.show();
+                this.context.apiPanel.toggle();
+                // Update button active state
+                const isVisible = document.getElementById('apiPanel').classList.contains('show');
+                apiToggleBtn.classList.toggle('active', isVisible);
             });
         }
 

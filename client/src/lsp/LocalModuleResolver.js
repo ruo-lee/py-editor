@@ -8,6 +8,10 @@ export class LocalModuleResolver {
     constructor(context) {
         this.context = context;
 
+        // Cache for file existence checks to reduce 404 requests
+        this.fileExistsCache = new Map();
+        this.cacheTimeout = 5000; // 5 seconds cache
+
         // Common external packages that should NOT be resolved as local modules
         this.externalPackages = new Set([
             'fastapi',
@@ -47,9 +51,15 @@ export class LocalModuleResolver {
     }
 
     /**
-     * Check if a file exists on the server
+     * Check if a file exists on the server (with caching to reduce 404 requests)
      */
     async fileExists(filepath) {
+        // Check cache first
+        const cached = this.fileExistsCache.get(filepath);
+        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+            return cached.exists;
+        }
+
         try {
             const workspaceFolder = this.context.workspaceFolder;
             const url = `/api/files/${filepath}${workspaceFolder ? `?folder=${workspaceFolder}` : ''}`;
@@ -57,8 +67,22 @@ export class LocalModuleResolver {
                 method: 'HEAD',
                 headers: this.context.getFetchHeaders(),
             });
-            return response.ok;
+
+            const exists = response.ok;
+
+            // Cache the result
+            this.fileExistsCache.set(filepath, {
+                exists,
+                timestamp: Date.now(),
+            });
+
+            return exists;
         } catch (error) {
+            // Cache negative result for failed requests too
+            this.fileExistsCache.set(filepath, {
+                exists: false,
+                timestamp: Date.now(),
+            });
             return false;
         }
     }
