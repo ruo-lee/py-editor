@@ -14,6 +14,27 @@ client/dist/
 jest.config.js
 .jest/
 server/README.test.md
+playwright.config.js
+
+# Playwright & Testing
+client/playwright-report/
+client/test-results/
+server/test-results/
+test-results/
+playwright-report/
+*.png
+*.webm
+**/error-context.md
+**/.last-run.json
+
+# Test coverage
+.nyc_output/
+*.lcov
+
+# Test helpers and fixtures
+client/__tests__/helpers/
+client/__tests__/fixtures/
+client/__tests__/global-*.js
 
 # Git and version control
 .git/

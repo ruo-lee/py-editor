@@ -19,15 +19,17 @@ const PORT = process.env.PORT || 8080;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// API Routes (MUST be before static files)
+app.use('/api/files', filesRouter);
+app.use('/api', workspaceRouter);
+app.use('/api', executionRouter);
 
 // Serve workspace files
 app.use('/workspace', express.static('/app/workspace'));
 
-// Routes
-app.use('/api/files', filesRouter);
-app.use('/api', workspaceRouter);
-app.use('/api', executionRouter);
+// Serve static files (MUST be after API routes)
+app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // WebSocket server for language server
 const server = require('http').createServer(app);
