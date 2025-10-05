@@ -160,4 +160,38 @@ router.get('/stdlib/*', async (req, res) => {
     }
 });
 
+// GET /api/templates - Get available file templates
+router.get('/templates', async (req, res) => {
+    try {
+        const templatesDir = path.join(__dirname, '../../templates');
+        const files = await fs.readdir(templatesDir);
+
+        const templates = await Promise.all(
+            files
+                .filter((file) => file.endsWith('.py'))
+                .map(async (file) => {
+                    const filePath = path.join(templatesDir, file);
+                    const content = await fs.readFile(filePath, 'utf8');
+                    const name = path.basename(file, '.py');
+                    return { name, content };
+                })
+        );
+
+        // Sort to ensure "빈파일" is first
+        templates.sort((a, b) => {
+            if (a.name === '빈파일') return -1;
+            if (b.name === '빈파일') return 1;
+            return a.name.localeCompare(b.name, 'ko');
+        });
+
+        res.json({ templates });
+    } catch (error) {
+        logger.error('Failed to load templates', { error: error.message });
+        res.status(500).json({
+            error: error.message,
+            templates: [{ name: '빈파일', content: '' }],
+        });
+    }
+});
+
 module.exports = router;

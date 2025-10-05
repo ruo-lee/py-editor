@@ -25,6 +25,7 @@ import { TabContextMenuManager } from './src/tabs/TabContextMenuManager.js';
 import { TabDragDropManager } from './src/tabs/TabDragDropManager.js';
 import { ModelSyncManager } from './src/sync/ModelSyncManager.js';
 import { WorkspaceManager } from './src/ui/WorkspaceManager.js';
+import { TemplateSelector } from './src/ui/TemplateSelector.js';
 import { getFileIcon } from './src/utils/fileIcons.js';
 import {
     closeAllDialogs,
@@ -44,6 +45,7 @@ import './styles/api-panel.css';
 import './styles/welcome.css';
 import './styles/components/dialogs.css';
 import './styles/components/context-menu.css';
+import './styles/components/template-selector.css';
 import './styles/themes/light.css';
 import './styles/references-panel.css';
 
@@ -157,6 +159,7 @@ class PythonIDE {
         this.fileLoader = new FileLoader(this);
         this.linkDecorationManager = new LinkDecorationManager(this);
         this.lspResponseHandlers = new LSPResponseHandlers(this);
+        this.templateSelector = new TemplateSelector(this);
 
         this.initializeEditor();
 
@@ -638,19 +641,26 @@ class PythonIDE {
     }
 
     showCreateDialog(type) {
-        this.dialogManager.showCreateDialog(
-            type,
-            this.selectedDirectory,
-            async (fullPath, type) => {
-                if (type === 'file') {
-                    await this.createFile(fullPath);
-                } else {
-                    await this.createFolder(fullPath);
-                }
-            },
-            (path) => this.checkIfFileExists(path),
-            () => this.loadFileExplorer()
-        );
+        if (type === 'file') {
+            // Show template selector instead of old dialog
+            const targetEditor = this.splitViewActive ? this.focusedEditor : 'left';
+            this.templateSelector.show(targetEditor);
+        } else {
+            // Keep old dialog for folder creation
+            this.dialogManager.showCreateDialog(
+                type,
+                this.selectedDirectory,
+                async (fullPath, type) => {
+                    if (type === 'file') {
+                        await this.createFile(fullPath);
+                    } else {
+                        await this.createFolder(fullPath);
+                    }
+                },
+                (path) => this.checkIfFileExists(path),
+                () => this.loadFileExplorer()
+            );
+        }
     }
 
     async createFile(filename) {
