@@ -70,12 +70,26 @@ export class ResizeManager {
             const deltaY = startY - e.clientY;
             const newHeight = startHeight + deltaY;
 
-            // Enforce minimum and maximum heights
-            const minHeight = 100;
-            const maxHeight = window.innerHeight - 300;
+            // Get workspace height for proper max calculation
+            const workspace = outputPanel.parentElement;
+            const workspaceHeight = workspace ? workspace.offsetHeight : window.innerHeight;
 
-            if (newHeight >= minHeight && newHeight <= maxHeight) {
-                outputPanel.style.height = `${newHeight}px`;
+            // Enforce minimum and maximum heights
+            const minHeight = 30; // Can collapse to header only
+            const maxHeight = workspaceHeight * 0.8; // 80% of workspace
+
+            const clampedHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+
+            // Update flex immediately (no transition delay)
+            outputPanel.style.flex = `0 0 ${clampedHeight}px`;
+
+            // Update collapsed state based on height
+            if (clampedHeight <= 35) {
+                // Small threshold for collapse
+                outputPanel.classList.add('collapsed');
+                outputPanel.style.flex = '0 0 30px';
+            } else {
+                outputPanel.classList.remove('collapsed');
             }
 
             e.preventDefault();

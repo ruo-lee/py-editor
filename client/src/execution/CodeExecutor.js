@@ -31,9 +31,14 @@ export class CodeExecutor {
 
         try {
             if (outputPanel && outputPanelContent) {
-                outputPanel.style.display = 'block';
+                outputPanel.style.display = 'flex';
                 outputPanelContent.className = 'output-panel-content';
                 outputPanelContent.textContent = 'Executing...';
+
+                // Show OUTPUT tab and expand panel
+                if (this.context && this.context.problemsManager) {
+                    this.context.problemsManager.showOutputTab();
+                }
             }
 
             const url = this.context ? this.context.buildUrl('/api/execute') : '/api/execute';

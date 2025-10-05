@@ -28,6 +28,7 @@ import { WorkspaceManager } from './src/ui/WorkspaceManager.js';
 import { TemplateSelector } from './src/ui/TemplateSelector.js';
 import { FormatManager } from './src/editor/FormatManager.js';
 import { TypeCheckManager } from './src/editor/TypeCheckManager.js';
+import { ProblemsManager } from './src/ui/ProblemsManager.js';
 import { getFileIcon } from './src/utils/fileIcons.js';
 import {
     closeAllDialogs,
@@ -98,6 +99,7 @@ class PythonIDE {
         this.contextMenuInstance = new ContextMenu();
         this.formatManager = new FormatManager(this);
         this.typeCheckManager = new TypeCheckManager(this);
+        this.problemsManager = new ProblemsManager(this);
 
         // Apply theme after ThemeManager is initialized
         this.applyTheme(this.currentTheme);
@@ -214,6 +216,11 @@ class PythonIDE {
     async initializeLanguageServer() {
         // Initialize LSPClient with snippets and fallback validation
         this.lspClientInstance = new LSPClient(this.snippets, () => this.setupBasicValidation());
+
+        // Connect LSP diagnostics to Problems panel
+        this.lspClientInstance.onDiagnosticsUpdate = (filepath, markers) => {
+            this.problemsManager.updateDiagnostics(filepath, markers);
+        };
 
         // Set callback to register providers AFTER LSP is fully initialized
         this.lspClientInstance.onInitialized = () => {

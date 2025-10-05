@@ -1,12 +1,25 @@
 /* Output panel styles */
 .output-panel {
-    height: 200px;
-    background: #1e1e1e;
-    border-top: 1px solid #3e3e42;
-    flex-shrink: 0;
+    flex: 0 0 200px; /* Fixed 200px, no grow/shrink by default */
+    min-height: 30px; /* Minimum: header only */
+    max-height: 80%; /* Maximum: 80% of workspace */
+    background: var(--vscode-panel-background);
+    border-top: 1px solid var(--vscode-panel-border);
     display: flex;
     flex-direction: column;
-    position: relative;
+    position: relative; /* For absolute positioned resizer */
+}
+
+/* Collapsed state - only header visible */
+.output-panel.collapsed {
+    flex: 0 0 30px;
+    min-height: 30px;
+    overflow: hidden;
+}
+
+.output-panel.collapsed .output-panel-content,
+.output-panel.collapsed .problems-panel-content {
+    display: none;
 }
 
 .output-panel-resizer {
@@ -25,14 +38,55 @@
 }
 
 .output-panel-header {
-    background: #252526;
-    border-bottom: 1px solid #3e3e42;
-    padding: 0 10px;
+    background: var(--vscode-panel-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     height: 30px;
     flex-shrink: 0;
+}
+
+.output-panel-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding-left: 10px;
+}
+
+.output-panel-tab {
+    background: transparent;
+    border: none;
+    color: var(--vscode-panelTitle-inactiveForeground);
+    cursor: pointer;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+    height: 30px;
+}
+
+.output-panel-tab:hover {
+    color: var(--vscode-panelTitle-activeForeground);
+}
+
+.output-panel-tab.active {
+    color: var(--vscode-panelTitle-activeForeground);
+    border-bottom-color: var(--vscode-panelTitle-activeBorder);
+}
+
+.problems-count {
+    background: #f14c4c;
+    color: #ffffff;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 600;
 }
 
 .output-panel-title {
@@ -46,17 +100,18 @@
     border: none;
     color: #cccccc;
     cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-size: 14px;
+    padding: 4px;
+    margin-right: 6px;
+    border-radius: 4px;
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.15s ease;
 }
 
 .output-panel-close:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background: #3e3e42;
 }
 
 .output-panel-content {
@@ -66,9 +121,93 @@
     overflow-y: auto;
     white-space: pre-wrap;
     flex: 1;
-    color: #cccccc;
+    min-height: 0; /* Allow flex item to shrink and enable scroll */
+    color: var(--vscode-editor-foreground);
+    background: var(--vscode-panel-background);
 }
 
 .output-panel-content.error {
+    color: var(--vscode-errorForeground);
+}
+
+/* Problems panel styles */
+.problems-panel-content {
+    flex: 1;
+    min-height: 0; /* Allow flex item to shrink and enable scroll */
+    overflow-y: auto;
+    padding: 8px 0;
+    background: var(--vscode-panel-background);
+}
+
+.problem-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    font-size: 12px;
+    transition: background 0.15s ease;
+}
+
+.problem-item:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.problem-severity {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.problem-severity i {
+    font-size: 14px;
+}
+
+.problem-severity.error i {
     color: #f14c4c;
+}
+
+.problem-severity.warning i {
+    color: #cca700;
+}
+
+.problem-severity.info i {
+    color: #75beff;
+}
+
+.problem-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.problem-message {
+    color: var(--vscode-editor-foreground);
+    line-height: 1.4;
+}
+
+.problem-location {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.problem-location .problem-file {
+    color: var(--vscode-textLink-foreground);
+}
+
+.problem-location .problem-position {
+    color: var(--vscode-descriptionForeground);
+}
+
+.problems-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
 }

@@ -21,21 +21,40 @@ body {
 .main-content {
     flex: 1;
     display: flex;
+    overflow: hidden;
+}
+
+/* Sidebar (Explorer) */
+.main-content > .sidebar {
+    width: 250px;
+    min-width: 200px;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #3c3c3c;
+    position: relative;
+}
+
+/* Right workspace (Editor + Bottom Panel) */
+.main-content > .editor-workspace {
+    flex: 1;
+    display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
-/* Editor workspace (sidebar + editor area) */
-.main-content > .editor-workspace {
-    flex: 1;
+/* Editor area takes remaining space after panel */
+.editor-workspace > .editor-area {
+    flex: 1 1 auto;
     display: flex;
     overflow: hidden;
+    min-height: 0; /* Allow flex item to shrink */
 }
 
-/* Unified output panel at bottom */
-.main-content > .output-panel {
-    width: 100%;
-    border-top: 1px solid #3c3c3c;
+/* When collapsed, show only header */
+.editor-workspace > .output-panel.collapsed {
+    height: 30px !important;
+    overflow: hidden;
 }
 
 /* Common utilities */

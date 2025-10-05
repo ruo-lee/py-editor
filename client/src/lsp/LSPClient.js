@@ -874,6 +874,11 @@ export class LSPClient {
 
         // Set markers on the model
         monaco.editor.setModelMarkers(model, 'pylsp', markers);
+
+        // Update Problems panel if available
+        if (this.onDiagnosticsUpdate) {
+            this.onDiagnosticsUpdate(filePath, markers);
+        }
     }
 
     /**

@@ -1,9 +1,11 @@
 /* Editor area and Monaco editor styles */
 .editor-area {
-    flex: 1;
-    display: flex;
-    flex-direction: row;
+    flex-direction: column; /* Default single editor mode */
     min-width: 0;
+}
+
+.editor-area.split-view {
+    flex-direction: row; /* Split view mode */
 }
 
 .editor-group {

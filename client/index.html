@@ -25,8 +25,7 @@
             </div>
         </div>
         <div class="main-content">
-            <div class="editor-workspace">
-                <div class="sidebar" id="sidebar">
+            <div class="sidebar" id="sidebar">
                 <div class="explorer-header">
                     <div class="explorer-title">Explorer</div>
                     <button class="action-button" id="toggleHiddenBtn" title="Toggle Hidden Files">
@@ -60,35 +59,45 @@
                 </div>
                 <div class="sidebar-resizer" id="sidebarResizer"></div>
             </div>
-            <div class="editor-area" id="editorArea">
-                <div class="editor-group">
-                    <div class="tab-bar" id="tabBar">
-                        <div class="tab-bar-tabs"></div>
-                        <div class="tab-bar-actions">
-                            <button class="execute-btn" id="executeButton" title="Run Code (Ctrl+R)" style="display: none;">
-                                <i class="codicon codicon-play"></i>
-                            </button>
-                            <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor" style="display: none;">
-                                <i class="codicon codicon-split-horizontal"></i>
-                            </button>
+            <div class="editor-workspace">
+                <div class="editor-area" id="editorArea">
+                    <div class="editor-group">
+                        <div class="tab-bar" id="tabBar">
+                            <div class="tab-bar-tabs"></div>
+                            <div class="tab-bar-actions">
+                                <button class="execute-btn" id="executeButton" title="Run Code (Ctrl+R)" style="display: none;">
+                                    <i class="codicon codicon-play"></i>
+                                </button>
+                                <button class="split-toggle-btn" id="splitToggleBtn" title="Split Editor" style="display: none;">
+                                    <i class="codicon codicon-split-horizontal"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="file-path-bar" id="filePathBar"></div>
+                        <div class="editor-container">
+                            <div id="editor"></div>
                         </div>
                     </div>
-                    <div class="file-path-bar" id="filePathBar"></div>
-                    <div class="editor-container">
-                        <div id="editor"></div>
+                </div>
+                <div class="output-panel" id="outputPanel">
+                    <div class="output-panel-resizer" id="outputPanelResizer"></div>
+                    <div class="output-panel-header" id="outputPanelHeader">
+                        <div class="output-panel-tabs">
+                            <button class="output-panel-tab active" data-tab="output">
+                                <span>OUTPUT</span>
+                            </button>
+                            <button class="output-panel-tab" data-tab="problems">
+                                <span>PROBLEMS</span>
+                                <span class="problems-count" id="problemsCount">0</span>
+                            </button>
+                        </div>
+                        <button class="output-panel-close" id="outputPanelClose" title="Close Panel">
+                            <i class="codicon codicon-close"></i>
+                        </button>
                     </div>
+                    <div class="output-panel-content" id="outputPanelContent"></div>
+                    <div class="problems-panel-content" id="problemsPanelContent" style="display: none;"></div>
                 </div>
-            </div>
-            </div>
-            <div class="output-panel" id="outputPanel" style="display: none;">
-                <div class="output-panel-resizer" id="outputPanelResizer"></div>
-                <div class="output-panel-header">
-                    <div class="output-panel-title">Output</div>
-                    <button class="output-panel-close" id="outputPanelClose" title="Close Output">
-                        <i class="codicon codicon-close"></i>
-                    </button>
-                </div>
-                <div class="output-panel-content" id="outputPanelContent"></div>
             </div>
         </div>
     </div>

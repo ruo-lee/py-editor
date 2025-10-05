@@ -136,8 +136,7 @@ body.light-theme .output-panel-close {
 }
 
 body.light-theme .output-panel-close:hover {
-    background: rgba(0, 0, 0, 0.05);
-    color: #000000;
+    background: #e8e8e8;
 }
 
 body.light-theme .output-panel-content {
