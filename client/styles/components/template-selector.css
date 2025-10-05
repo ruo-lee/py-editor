@@ -117,11 +117,64 @@ body.light-theme .template-selector-header {
     border-bottom-color: rgba(0, 0, 0, 0.06);
 }
 
+.template-filetype-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+}
+
+.template-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(204, 204, 204, 0.6);
+}
+
+body.light-theme .template-label {
+    color: rgba(97, 97, 97, 0.6);
+}
+
+.template-filetype-select {
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 13px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.template-filetype-select:hover {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.template-filetype-select:focus {
+    outline: none;
+    border-color: #007acc;
+    box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.15);
+}
+
+body.light-theme .template-filetype-select {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #1a1a1a;
+}
+
+body.light-theme .template-filetype-select:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
 .template-filename-section {
     flex: 1;
     display: flex;
-    align-items: stretch;
-    gap: 0;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .template-input-group {
@@ -219,6 +272,11 @@ body.light-theme .template-filename-input::placeholder {
     background: rgba(37, 37, 38, 0.4);
     border-right: 1px solid rgba(255, 255, 255, 0.06);
     overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.template-list-section.hidden {
+    display: none;
 }
 
 body.light-theme .template-list-section {
@@ -323,6 +381,11 @@ body.light-theme .template-item.selected .template-item-icon {
     flex-direction: column;
     background: transparent;
     overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.template-preview-section.full-width {
+    grid-column: 1 / -1;
 }
 
 .template-preview-header {

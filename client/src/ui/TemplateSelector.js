@@ -9,6 +9,69 @@ export class TemplateSelector {
         this.templates = [];
         this.selectedTemplate = null;
         this.previewEditors = {}; // targetEditor별 미리보기 에디터 저장
+        this.selectedFileType = 'python'; // 기본값: Python
+
+        // 지원하는 파일 타입 정의
+        this.fileTypes = [
+            {
+                id: 'python',
+                label: 'Python',
+                extension: '.py',
+                language: 'python',
+                hasTemplates: true,
+            },
+            {
+                id: 'text',
+                label: 'Text',
+                extension: '.txt',
+                language: 'plaintext',
+                hasTemplates: false,
+            },
+            {
+                id: 'json',
+                label: 'JSON',
+                extension: '.json',
+                language: 'json',
+                hasTemplates: false,
+            },
+            {
+                id: 'csv',
+                label: 'CSV',
+                extension: '.csv',
+                language: 'plaintext',
+                hasTemplates: false,
+            },
+            {
+                id: 'html',
+                label: 'HTML',
+                extension: '.html',
+                language: 'html',
+                hasTemplates: false,
+            },
+            { id: 'css', label: 'CSS', extension: '.css', language: 'css', hasTemplates: false },
+            {
+                id: 'javascript',
+                label: 'JavaScript',
+                extension: '.js',
+                language: 'javascript',
+                hasTemplates: false,
+            },
+            {
+                id: 'markdown',
+                label: 'Markdown',
+                extension: '.md',
+                language: 'markdown',
+                hasTemplates: false,
+            },
+            { id: 'xml', label: 'XML', extension: '.xml', language: 'xml', hasTemplates: false },
+            {
+                id: 'yaml',
+                label: 'YAML',
+                extension: '.yaml',
+                language: 'yaml',
+                hasTemplates: false,
+            },
+        ];
     }
 
     /**
@@ -32,6 +95,9 @@ export class TemplateSelector {
      * @param {string} targetEditor - 'left' or 'right'
      */
     async show(targetEditor = 'left') {
+        // 파일 타입을 Python으로 초기화
+        this.selectedFileType = 'python';
+
         // 템플릿 로드
         await this.loadTemplates();
 
@@ -128,19 +194,33 @@ export class TemplateSelector {
         const panel = document.createElement('div');
         panel.className = 'template-selector-panel';
 
+        const currentFileType = this.fileTypes.find((ft) => ft.id === this.selectedFileType);
+        const defaultFilename = `새파일${currentFileType.extension}`;
+
         panel.innerHTML = `
             <div class="template-selector-container">
                 <button class="template-close-btn" title="닫기 (ESC)">
                     <i class="codicon codicon-close"></i>
                 </button>
                 <div class="template-selector-header">
+                    <div class="template-filetype-section">
+                        <label class="template-label">파일 유형</label>
+                        <select class="template-filetype-select">
+                            ${this.fileTypes
+                                .map(
+                                    (ft) =>
+                                        `<option value="${ft.id}" ${ft.id === this.selectedFileType ? 'selected' : ''}>${ft.label} (${ft.extension})</option>`
+                                )
+                                .join('')}
+                        </select>
+                    </div>
                     <div class="template-filename-section">
-                        <label class="template-filename-label">파일 이름</label>
+                        <label class="template-label">파일 이름</label>
                         <div class="template-input-group">
                             <input type="text"
                                    class="template-filename-input"
-                                   placeholder="새파일.py"
-                                   value="새파일.py">
+                                   placeholder="${defaultFilename}"
+                                   value="${defaultFilename}">
                             <button class="template-create-btn" title="파일 생성">
                                 <i class="codicon codicon-check"></i>
                                 생성
@@ -149,13 +229,13 @@ export class TemplateSelector {
                     </div>
                 </div>
                 <div class="template-selector-body">
-                    <div class="template-list-section">
+                    <div class="template-list-section ${currentFileType.hasTemplates ? '' : 'hidden'}">
                         <div class="template-list-header">템플릿</div>
                         <div class="template-list">
                             ${this.renderTemplateList()}
                         </div>
                     </div>
-                    <div class="template-preview-section">
+                    <div class="template-preview-section ${currentFileType.hasTemplates ? '' : 'full-width'}">
                         <div class="template-preview-header">미리보기</div>
                         <div class="template-preview" id="template-preview-${targetEditor}"></div>
                     </div>
@@ -202,6 +282,12 @@ export class TemplateSelector {
             this.hide(targetEditor);
         });
 
+        // 파일 타입 선택 변경
+        const fileTypeSelect = panel.querySelector('.template-filetype-select');
+        fileTypeSelect.addEventListener('change', (e) => {
+            this.handleFileTypeChange(e.target.value, targetEditor);
+        });
+
         // 템플릿 항목 클릭
         panel.querySelectorAll('.template-item').forEach((item) => {
             item.addEventListener('click', () => {
@@ -228,7 +314,7 @@ export class TemplateSelector {
         });
 
         // 입력창 포커스 유지
-        nameInput.addEventListener('blur', (e) => {
+        nameInput.addEventListener('blur', () => {
             // container 내부 요소로 포커스가 이동하는 경우가 아니면 다시 포커스
             setTimeout(() => {
                 if (!container.contains(document.activeElement)) {
@@ -252,6 +338,50 @@ export class TemplateSelector {
                 this.hide(targetEditor);
             }
         });
+    }
+
+    /**
+     * 파일 타입 변경 핸들러
+     */
+    handleFileTypeChange(fileTypeId, targetEditor) {
+        this.selectedFileType = fileTypeId;
+        const editorContainer = this.getEditorContainer(targetEditor);
+        if (!editorContainer) return;
+
+        const panel = editorContainer.querySelector('.template-selector-panel');
+        if (!panel) return;
+
+        const currentFileType = this.fileTypes.find((ft) => ft.id === fileTypeId);
+        const nameInput = panel.querySelector('.template-filename-input');
+
+        // 파일명 확장자 업데이트
+        let currentFilename = nameInput.value.trim();
+        // 기존 확장자 제거
+        const lastDotIndex = currentFilename.lastIndexOf('.');
+        if (lastDotIndex !== -1) {
+            currentFilename = currentFilename.substring(0, lastDotIndex);
+        }
+        // 새 확장자 추가
+        nameInput.value = currentFilename + currentFileType.extension;
+        nameInput.placeholder = `새파일${currentFileType.extension}`;
+
+        // 템플릿 섹션 표시/숨김
+        const templateSection = panel.querySelector('.template-list-section');
+        const previewSection = panel.querySelector('.template-preview-section');
+
+        if (currentFileType.hasTemplates) {
+            templateSection.classList.remove('hidden');
+            previewSection.classList.remove('full-width');
+            // 첫 번째 템플릿 선택
+            if (this.templates.length > 0) {
+                this.selectTemplate(this.templates[0], targetEditor);
+            }
+        } else {
+            templateSection.classList.add('hidden');
+            previewSection.classList.add('full-width');
+            // 빈 파일 미리보기
+            this.updatePreviewForFileType(currentFileType, '', targetEditor);
+        }
     }
 
     /**
@@ -283,14 +413,22 @@ export class TemplateSelector {
      * Monaco Editor를 사용한 미리보기 업데이트
      */
     updatePreview(template, targetEditor) {
+        const currentFileType = this.fileTypes.find((ft) => ft.id === this.selectedFileType);
+        this.updatePreviewForFileType(currentFileType, template.content || '', targetEditor);
+    }
+
+    /**
+     * 파일 타입에 맞는 미리보기 업데이트
+     */
+    updatePreviewForFileType(fileType, content, targetEditor) {
         const previewContainer = document.getElementById(`template-preview-${targetEditor}`);
         if (!previewContainer) return;
 
         // 기존 에디터가 있으면 재사용, 없으면 새로 생성
         if (!this.previewEditors[targetEditor]) {
             this.previewEditors[targetEditor] = monaco.editor.create(previewContainer, {
-                value: template.content || '',
-                language: 'python',
+                value: content,
+                language: fileType.language,
                 theme: document.body.classList.contains('light-theme') ? 'vs' : 'vs-dark',
                 readOnly: true,
                 minimap: { enabled: false },
@@ -327,8 +465,12 @@ export class TemplateSelector {
             previewContainer.style.cursor = 'default';
             previewContainer.addEventListener('mousedown', (e) => e.preventDefault());
         } else {
-            // 기존 에디터 내용만 업데이트
-            this.previewEditors[targetEditor].setValue(template.content || '');
+            // 기존 에디터 내용 및 언어 업데이트
+            const model = this.previewEditors[targetEditor].getModel();
+            if (model) {
+                monaco.editor.setModelLanguage(model, fileType.language);
+            }
+            this.previewEditors[targetEditor].setValue(content);
         }
     }
 
@@ -351,9 +493,11 @@ export class TemplateSelector {
             return;
         }
 
-        // .py 확장자 자동 추가
-        if (!filename.endsWith('.py')) {
-            filename = filename + '.py';
+        const currentFileType = this.fileTypes.find((ft) => ft.id === this.selectedFileType);
+
+        // 확장자 자동 추가 (없는 경우에만)
+        if (!filename.includes('.')) {
+            filename = filename + currentFileType.extension;
         }
 
         // 현재 선택된 디렉토리 경로 포함
@@ -370,8 +514,11 @@ export class TemplateSelector {
         }
 
         try {
-            // 선택된 템플릿 내용으로 파일 생성
-            const content = this.selectedTemplate ? this.selectedTemplate.content : '';
+            // 선택된 템플릿 내용으로 파일 생성 (Python만 템플릿 사용, 나머지는 빈 파일)
+            let content = '';
+            if (currentFileType.hasTemplates && this.selectedTemplate) {
+                content = this.selectedTemplate.content;
+            }
 
             const response = await fetch(this.ide.buildUrl(`/api/files/${fullPath}`), {
                 method: 'POST',
