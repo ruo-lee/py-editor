@@ -93,9 +93,12 @@ export class UnifiedTabManager {
         );
 
         if (existingTabElement) {
+            console.log('[DEBUG] Tab already exists, switching:', filepath);
             this.switchTab(filepath);
             return;
         }
+
+        console.log('[DEBUG] Opening new tab:', filepath);
 
         // Create new tab UI element (even if already in openTabs Map)
         const tab = this.createTabElement(filepath, isStdlib);
@@ -111,6 +114,8 @@ export class UnifiedTabManager {
      */
     createTabElement(filepath, isStdlib = false) {
         const filename = filepath.split('/').pop();
+
+        console.log('[DEBUG] Creating tab:', { filepath, filename, isStdlib });
 
         const tab = document.createElement('div');
         tab.className = 'tab' + (isStdlib ? ' stdlib-tab' : '');

@@ -19,6 +19,8 @@ export class FileExplorer {
         this.allFileElements = []; // Ordered list of all file elements for range selection
         this.dropZoneInitialized = false;
         this.expandedFolders = new Set(); // Track expanded folders
+        this.lastDragEndTime = 0; // Track last drag end time to prevent click after drag
+        this.isDragging = false; // Track if currently in drag operation
 
         // Callbacks
         this.onFileClick = options.onFileClick || (() => {});
@@ -129,6 +131,16 @@ export class FileExplorer {
             if (e.target === toggle) return; // Don't select when clicking toggle
             e.stopPropagation();
 
+            // Ignore click if currently dragging or just finished dragging
+            if (this.isDragging) {
+                return;
+            }
+
+            const timeSinceDrag = Date.now() - this.lastDragEndTime;
+            if (timeSinceDrag < 300) {
+                return;
+            }
+
             // Focus the file explorer to enable keyboard shortcuts
             this.container.focus();
 
@@ -207,6 +219,18 @@ export class FileExplorer {
         element.addEventListener('click', (e) => {
             e.stopPropagation();
 
+            // Ignore click if currently dragging or just finished dragging
+            if (this.isDragging) {
+                console.log('[DEBUG] Click ignored - currently dragging');
+                return;
+            }
+
+            const timeSinceDrag = Date.now() - this.lastDragEndTime;
+            if (timeSinceDrag < 300) {
+                console.log('[DEBUG] Click ignored - only', timeSinceDrag, 'ms since drag end');
+                return;
+            }
+
             // Focus the file explorer to enable keyboard shortcuts
             this.container.focus();
 
@@ -226,6 +250,7 @@ export class FileExplorer {
                 this.lastClickedItem = item;
 
                 // Open file but keep focus on explorer for keyboard shortcuts
+                console.log('[DEBUG] File click opening file:', item.path);
                 this.onFileClick(item.path);
             }
         });
@@ -377,6 +402,10 @@ export class FileExplorer {
             e.stopPropagation();
             container.classList.remove('drag-over');
 
+            // Record drop time to prevent click event immediately after drop
+            this.lastDragEndTime = Date.now();
+            console.log('[DEBUG] Drop to root occurred at', this.lastDragEndTime);
+
             // Internal file/folder move to root
             if (e.dataTransfer.types.includes('application/json')) {
                 const data = JSON.parse(e.dataTransfer.getData('application/json'));
@@ -452,6 +481,8 @@ export class FileExplorer {
             }
 
             element.classList.add('dragging');
+            this.isDragging = true;
+            console.log('[DEBUG] Drag started');
         });
 
         element.addEventListener('dragend', (_e) => {
@@ -459,6 +490,10 @@ export class FileExplorer {
             document.querySelectorAll('.drag-over').forEach((el) => {
                 el.classList.remove('drag-over');
             });
+            // Record drag end time to prevent click event immediately after drag
+            this.lastDragEndTime = Date.now();
+            this.isDragging = false;
+            console.log('[DEBUG] Drag ended at', this.lastDragEndTime);
         });
     }
 
@@ -491,6 +526,10 @@ export class FileExplorer {
             e.preventDefault();
             e.stopPropagation();
             element.classList.remove('drag-over');
+
+            // Record drop time to prevent click event immediately after drop
+            this.lastDragEndTime = Date.now();
+            console.log('[DEBUG] Drop occurred at', this.lastDragEndTime);
 
             // Internal file/folder move
             if (e.dataTransfer.types.includes('application/json')) {
