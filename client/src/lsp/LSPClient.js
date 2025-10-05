@@ -134,6 +134,17 @@ export class LSPClient {
      * Handle LSP server responses
      */
     handleResponse(response) {
+        // Handle notifications (no id)
+        if (!response.id && response.method) {
+            switch (response.method) {
+                case 'textDocument/publishDiagnostics':
+                    this.handlePublishDiagnostics(response);
+                    break;
+            }
+            return;
+        }
+
+        // Handle responses (with id)
         if (response.id && this.pendingRequests.has(response.id)) {
             const request = this.pendingRequests.get(response.id);
             this.pendingRequests.delete(response.id);
@@ -814,6 +825,74 @@ export class LSPClient {
                 }
             }, 2000);
         });
+    }
+
+    /**
+     * Handle diagnostics from LSP server (type errors, syntax errors, etc.)
+     */
+    handlePublishDiagnostics(notification) {
+        const params = notification.params;
+        if (!params || !params.uri) return;
+
+        // Extract file path from URI
+        let filePath;
+        if (params.uri.startsWith('file:///app/workspace/')) {
+            const encodedPath = params.uri.replace('file:///app/workspace/', '');
+            filePath = encodedPath
+                .split('/')
+                .map((component) => decodeURIComponent(component))
+                .join('/');
+        } else if (params.uri.startsWith('file://')) {
+            filePath = params.uri.replace('file://', '');
+        } else {
+            filePath = params.uri;
+        }
+
+        // Get the Monaco model for this file
+        const modelUri = this.isStdlibFile(filePath)
+            ? monaco.Uri.parse(`stdlib://${filePath}`)
+            : monaco.Uri.file(filePath);
+        const model = monaco.editor.getModel(modelUri);
+
+        if (!model) {
+            // Model not found - might be closed or not yet created
+            return;
+        }
+
+        // Convert LSP diagnostics to Monaco markers
+        const markers = (params.diagnostics || []).map((diagnostic) => {
+            return {
+                severity: this.convertDiagnosticSeverity(diagnostic.severity),
+                startLineNumber: diagnostic.range.start.line + 1,
+                startColumn: diagnostic.range.start.character + 1,
+                endLineNumber: diagnostic.range.end.line + 1,
+                endColumn: diagnostic.range.end.character + 1,
+                message: diagnostic.message,
+                source: diagnostic.source || 'pylsp',
+            };
+        });
+
+        // Set markers on the model
+        monaco.editor.setModelMarkers(model, 'pylsp', markers);
+    }
+
+    /**
+     * Convert LSP diagnostic severity to Monaco marker severity
+     */
+    convertDiagnosticSeverity(severity) {
+        // LSP severity: 1=Error, 2=Warning, 3=Information, 4=Hint
+        switch (severity) {
+            case 1:
+                return monaco.MarkerSeverity.Error;
+            case 2:
+                return monaco.MarkerSeverity.Warning;
+            case 3:
+                return monaco.MarkerSeverity.Info;
+            case 4:
+                return monaco.MarkerSeverity.Hint;
+            default:
+                return monaco.MarkerSeverity.Error;
+        }
     }
 
     /**
