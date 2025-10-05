@@ -39,7 +39,20 @@ export class FileUploadManager {
                 // Save expanded folder states before moving
                 const expandedFolders = this.context.fileExplorerInstance.getExpandedFolders();
 
+                // Check if the file is currently open in either editor
+                const isOpenInLeft = this.context.openTabs.has(draggedItem.path);
+                const isOpenInRight =
+                    this.context.rightOpenTabs && this.context.rightOpenTabs.has(draggedItem.path);
+                const wasActiveInLeft = this.context.activeFile === draggedItem.path;
+                const wasActiveInRight = this.context.rightActiveFile === draggedItem.path;
+
+                // Move the file - this will automatically update openTabs and tab UI
                 await this.context.moveItem(draggedItem.path, newPath);
+
+                // Wait a bit for the file system to settle
+                await new Promise((resolve) => setTimeout(resolve, 100));
+
+                // Reload file explorer to show updated file structure
                 await this.context.loadFileExplorer();
 
                 // Restore expanded folders and selection after move

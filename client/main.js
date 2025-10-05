@@ -25,6 +25,7 @@ import { TabContextMenuManager } from './src/tabs/TabContextMenuManager.js';
 import { TabDragDropManager } from './src/tabs/TabDragDropManager.js';
 import { ModelSyncManager } from './src/sync/ModelSyncManager.js';
 import { WorkspaceManager } from './src/ui/WorkspaceManager.js';
+import { TemplateSelector } from './src/ui/TemplateSelector.js';
 import { getFileIcon } from './src/utils/fileIcons.js';
 import {
     closeAllDialogs,
@@ -44,6 +45,7 @@ import './styles/api-panel.css';
 import './styles/welcome.css';
 import './styles/components/dialogs.css';
 import './styles/components/context-menu.css';
+import './styles/components/template-selector.css';
 import './styles/themes/light.css';
 import './styles/references-panel.css';
 
@@ -128,7 +130,7 @@ class PythonIDE {
                 this.selectedDirectory = path;
                 this.selectedItem = { path, type: 'directory' };
             },
-            onContextMenu: (e, item) => this.showContextMenu(e, item),
+            onContextMenu: (e, filePath, type) => this.showContextMenu(e, filePath, type),
             onFileMove: (draggedItem, targetPath) => this.handleItemMove(draggedItem, targetPath),
             onExternalFileDrop: (files, targetPath, type) =>
                 this.handleExternalFileDrop(files, targetPath, type),
@@ -157,6 +159,7 @@ class PythonIDE {
         this.fileLoader = new FileLoader(this);
         this.linkDecorationManager = new LinkDecorationManager(this);
         this.lspResponseHandlers = new LSPResponseHandlers(this);
+        this.templateSelector = new TemplateSelector(this);
 
         this.initializeEditor();
 
@@ -638,19 +641,26 @@ class PythonIDE {
     }
 
     showCreateDialog(type) {
-        this.dialogManager.showCreateDialog(
-            type,
-            this.selectedDirectory,
-            async (fullPath, type) => {
-                if (type === 'file') {
-                    await this.createFile(fullPath);
-                } else {
-                    await this.createFolder(fullPath);
-                }
-            },
-            (path) => this.checkIfFileExists(path),
-            () => this.loadFileExplorer()
-        );
+        if (type === 'file') {
+            // Show template selector instead of old dialog
+            const targetEditor = this.splitViewActive ? this.focusedEditor : 'left';
+            this.templateSelector.show(targetEditor);
+        } else {
+            // Keep old dialog for folder creation
+            this.dialogManager.showCreateDialog(
+                type,
+                this.selectedDirectory,
+                async (fullPath, type) => {
+                    if (type === 'file') {
+                        await this.createFile(fullPath);
+                    } else {
+                        await this.createFolder(fullPath);
+                    }
+                },
+                (path) => this.checkIfFileExists(path),
+                () => this.loadFileExplorer()
+            );
+        }
     }
 
     async createFile(filename) {
@@ -907,23 +917,22 @@ class PythonIDE {
         // Check if multiple items are selected
         if (this.fileExplorerInstance.selectedItems.length > 1) {
             // Delete multiple items
-            const itemNames = this.fileExplorerInstance.selectedItems
-                .map((item) => item.path.split('/').pop())
-                .join(', ');
+            const items = [...this.fileExplorerInstance.selectedItems]; // 배열 복사
+            const itemNames = items.map((item) => item.path.split('/').pop()).join(', ');
 
-            if (
-                !confirm(
-                    `Delete ${this.fileExplorerInstance.selectedItems.length} items (${itemNames})?`
-                )
-            ) {
+            if (!confirm(`${items.length}개 항목을 삭제하시겠습니까?\n\n${itemNames}`)) {
                 return;
             }
 
             // Save expanded folder states
             const expandedFolders = this.fileExplorerInstance.getExpandedFolders();
 
-            for (const item of this.fileExplorerInstance.selectedItems) {
-                await this.fileOpsAdvanced.deleteItem(item.path, item.type);
+            // Clear selection before deleting to prevent interference
+            this.fileExplorerInstance.clearSelection();
+
+            // Delete all items without individual confirmation
+            for (const item of items) {
+                await this.fileOpsAdvanced.deleteItem(item.path, item.type, true);
             }
 
             // Reload and restore
@@ -932,8 +941,8 @@ class PythonIDE {
                 this.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
             }, 100);
         } else {
-            // Delete single item
-            await this.fileOpsAdvanced.deleteItem(filePath, type);
+            // Delete single item with confirmation
+            await this.fileOpsAdvanced.deleteItem(filePath, type, false);
         }
     }
 

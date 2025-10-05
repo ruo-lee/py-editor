@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1759574473295" clover="3.2.0">
-  <project timestamp="1759574473295" name="All files">
-    <metrics statements="310" coveredstatements="215" conditionals="71" coveredconditionals="27" methods="56" coveredmethods="33" elements="437" coveredelements="275" complexity="0" loc="310" ncloc="310" packages="4" files="8" classes="8"/>
+<coverage generated="1759661704253" clover="3.2.0">
+  <project timestamp="1759661704253" name="All files">
+    <metrics statements="327" coveredstatements="216" conditionals="75" coveredconditionals="27" methods="60" coveredmethods="33" elements="462" coveredelements="276" complexity="0" loc="327" ncloc="327" packages="4" files="8" classes="8"/>
     <package name="server">
       <metrics statements="45" coveredstatements="4" conditionals="25" coveredconditionals="0" methods="9" coveredmethods="0"/>
       <file name="api-proxy.js" path="/home/ruo/my_project/py-editor/server/api-proxy.js">
@@ -54,7 +54,7 @@
       </file>
     </package>
     <package name="server.routes">
-      <metrics statements="159" coveredstatements="127" conditionals="10" coveredconditionals="6" methods="16" coveredmethods="13"/>
+      <metrics statements="176" coveredstatements="128" conditionals="14" coveredconditionals="6" methods="20" coveredmethods="13"/>
       <file name="execution.js" path="/home/ruo/my_project/py-editor/server/routes/execution.js">
         <metrics statements="33" coveredstatements="18" conditionals="2" coveredconditionals="0" methods="5" coveredmethods="2"/>
         <line num="5" count="2" type="stmt"/>
@@ -134,7 +134,7 @@
         <line num="72" count="2" type="stmt"/>
       </file>
       <file name="workspace.js" path="/home/ruo/my_project/py-editor/server/routes/workspace.js">
-        <metrics statements="87" coveredstatements="74" conditionals="6" coveredconditionals="5" methods="7" coveredmethods="7"/>
+        <metrics statements="104" coveredstatements="75" conditionals="10" coveredconditionals="5" methods="11" coveredmethods="7"/>
         <line num="5" count="2" type="stmt"/>
         <line num="6" count="2" type="stmt"/>
         <line num="7" count="2" type="stmt"/>
@@ -221,7 +221,24 @@
         <line num="156" count="2" type="stmt"/>
         <line num="158" count="0" type="stmt"/>
         <line num="159" count="0" type="stmt"/>
-        <line num="163" count="2" type="stmt"/>
+        <line num="164" count="2" type="stmt"/>
+        <line num="165" count="0" type="stmt"/>
+        <line num="166" count="0" type="stmt"/>
+        <line num="167" count="0" type="stmt"/>
+        <line num="169" count="0" type="stmt"/>
+        <line num="171" count="0" type="stmt"/>
+        <line num="173" count="0" type="stmt"/>
+        <line num="174" count="0" type="stmt"/>
+        <line num="175" count="0" type="stmt"/>
+        <line num="176" count="0" type="stmt"/>
+        <line num="181" count="0" type="stmt"/>
+        <line num="182" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="183" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="184" count="0" type="stmt"/>
+        <line num="187" count="0" type="stmt"/>
+        <line num="189" count="0" type="stmt"/>
+        <line num="190" count="0" type="stmt"/>
+        <line num="197" count="2" type="stmt"/>
       </file>
     </package>
     <package name="server.services">
@@ -263,7 +280,7 @@
         <line num="124" count="26" type="stmt"/>
         <line num="125" count="21" type="stmt"/>
         <line num="128" count="26" type="stmt"/>
-        <line num="129" count="11" type="stmt"/>
+        <line num="129" count="22" type="stmt"/>
         <line num="132" count="26" type="stmt"/>
         <line num="133" count="26" type="stmt"/>
         <line num="135" count="26" type="stmt"/>

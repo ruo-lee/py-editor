@@ -15,8 +15,12 @@ export class FileExplorer {
         this.selectedDirectory = '';
         this.selectedItem = null;
         this.selectedItems = []; // Multi-selection support
+        this.lastClickedItem = null; // For shift+click range selection
+        this.allFileElements = []; // Ordered list of all file elements for range selection
         this.dropZoneInitialized = false;
         this.expandedFolders = new Set(); // Track expanded folders
+        this.lastDragEndTime = 0; // Track last drag end time to prevent click after drag
+        this.isDragging = false; // Track if currently in drag operation
 
         // Callbacks
         this.onFileClick = options.onFileClick || (() => {});
@@ -55,6 +59,9 @@ export class FileExplorer {
             this.saveExpandedState();
 
             container.innerHTML = '';
+            // Reset file elements tracking for range selection
+            this.allFileElements = [];
+
             // Setup drop zone on the workspace content area (entire panel) - only once
             if (!this.dropZoneInitialized) {
                 const workspaceContent = document.getElementById('workspaceContent');
@@ -77,6 +84,8 @@ export class FileExplorer {
                 this.renderDirectory(element, item, container, level);
             } else {
                 this.renderFile(element, item, container);
+                // Track file elements in order for range selection
+                this.allFileElements.push({ element, item });
             }
         });
     }
@@ -122,6 +131,16 @@ export class FileExplorer {
             if (e.target === toggle) return; // Don't select when clicking toggle
             e.stopPropagation();
 
+            // Ignore click if currently dragging or just finished dragging
+            if (this.isDragging) {
+                return;
+            }
+
+            const timeSinceDrag = Date.now() - this.lastDragEndTime;
+            if (timeSinceDrag < 300) {
+                return;
+            }
+
             // Focus the file explorer to enable keyboard shortcuts
             this.container.focus();
 
@@ -129,11 +148,18 @@ export class FileExplorer {
             if (e.metaKey || e.ctrlKey) {
                 this.toggleSelection(element, item, 'directory');
             } else {
-                this.clearSelection();
-                element.classList.add('selected');
-                this.selectedDirectory = item.path;
-                this.selectedItem = { path: item.path, name: item.name, type: 'directory' };
-                this.selectedItems = [{ path: item.path, name: item.name, type: 'directory' }];
+                // Check if clicking on already selected item in multi-selection
+                const isAlreadySelected =
+                    this.selectedItems.length > 1 &&
+                    this.selectedItems.some((selectedItem) => selectedItem.path === item.path);
+
+                if (!isAlreadySelected) {
+                    this.clearSelection();
+                    element.classList.add('selected');
+                    this.selectedDirectory = item.path;
+                    this.selectedItem = { path: item.path, name: item.name, type: 'directory' };
+                    this.selectedItems = [{ path: item.path, name: item.name, type: 'directory' }];
+                }
             }
 
             this.onFolderClick(item.path);
@@ -142,6 +168,20 @@ export class FileExplorer {
         // Right-click context menu
         element.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+
+            // If right-clicked item is not already selected, clear and select only this item
+            const isAlreadySelected = this.selectedItems.some(
+                (selectedItem) => selectedItem.path === item.path
+            );
+
+            if (!isAlreadySelected) {
+                this.clearSelection();
+                element.classList.add('selected');
+                this.selectedDirectory = item.path;
+                this.selectedItem = { path: item.path, name: item.name, type: 'directory' };
+                this.selectedItems = [{ path: item.path, name: item.name, type: 'directory' }];
+            }
+
             this.onContextMenu(e, item.path, 'directory');
         });
 
@@ -179,17 +219,33 @@ export class FileExplorer {
         element.addEventListener('click', (e) => {
             e.stopPropagation();
 
+            // Ignore click if currently dragging or just finished dragging
+            if (this.isDragging) {
+                return;
+            }
+
+            const timeSinceDrag = Date.now() - this.lastDragEndTime;
+            if (timeSinceDrag < 300) {
+                return;
+            }
+
             // Focus the file explorer to enable keyboard shortcuts
             this.container.focus();
 
-            // Multi-selection with Cmd/Ctrl key
-            if (e.metaKey || e.ctrlKey) {
+            if (e.shiftKey && (e.metaKey || e.ctrlKey)) {
+                // Ctrl+Shift+Click: Range selection from last clicked item
+                this.selectRange(element, item, 'file');
+            } else if (e.metaKey || e.ctrlKey) {
+                // Ctrl+Click: Toggle selection (add/remove from selection)
                 this.toggleSelection(element, item, 'file');
+                this.lastClickedItem = item;
             } else {
+                // Normal click: Clear previous selection and select only this item
                 this.clearSelection();
                 element.classList.add('selected');
                 this.selectedItem = { path: item.path, name: item.name, type: 'file' };
                 this.selectedItems = [{ path: item.path, name: item.name, type: 'file' }];
+                this.lastClickedItem = item;
 
                 // Open file but keep focus on explorer for keyboard shortcuts
                 this.onFileClick(item.path);
@@ -199,6 +255,19 @@ export class FileExplorer {
         // Right-click context menu
         element.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+
+            // If right-clicked item is not already selected, clear and select only this item
+            const isAlreadySelected = this.selectedItems.some(
+                (selectedItem) => selectedItem.path === item.path
+            );
+
+            if (!isAlreadySelected) {
+                this.clearSelection();
+                element.classList.add('selected');
+                this.selectedItem = { path: item.path, name: item.name, type: 'file' };
+                this.selectedItems = [{ path: item.path, name: item.name, type: 'file' }];
+            }
+
             this.onContextMenu(e, item.path, 'file');
         });
 
@@ -246,6 +315,56 @@ export class FileExplorer {
     }
 
     /**
+     * Select range of files from last clicked item to current item (Ctrl+Shift+Click)
+     */
+    selectRange(element, item, type) {
+        if (!this.lastClickedItem || this.allFileElements.length === 0) {
+            // No previous selection, just select this item
+            this.clearSelection();
+            element.classList.add('selected');
+            this.selectedItems = [{ path: item.path, name: item.name, type: type }];
+            this.selectedItem = this.selectedItems[0];
+            this.lastClickedItem = item;
+            return;
+        }
+
+        // Find indices of last clicked item and current item
+        const lastIndex = this.allFileElements.findIndex(
+            (fileEl) => fileEl.item.path === this.lastClickedItem.path
+        );
+        const currentIndex = this.allFileElements.findIndex(
+            (fileEl) => fileEl.item.path === item.path
+        );
+
+        if (lastIndex === -1 || currentIndex === -1) {
+            return;
+        }
+
+        // Determine range direction
+        const startIndex = Math.min(lastIndex, currentIndex);
+        const endIndex = Math.max(lastIndex, currentIndex);
+
+        // Clear previous selection
+        this.clearSelection();
+
+        // Select all items in range
+        for (let i = startIndex; i <= endIndex; i++) {
+            const fileEl = this.allFileElements[i];
+            fileEl.element.classList.add('selected');
+            this.selectedItems.push({
+                path: fileEl.item.path,
+                name: fileEl.item.name,
+                type: 'file',
+            });
+        }
+
+        // Update selectedItem to the last item in the range
+        if (this.selectedItems.length > 0) {
+            this.selectedItem = this.selectedItems[this.selectedItems.length - 1];
+        }
+    }
+
+    /**
      * Setup drop zone for the entire explorer (for external file uploads and root moves)
      */
     setupExplorerDropZone(container) {
@@ -279,6 +398,9 @@ export class FileExplorer {
             e.preventDefault();
             e.stopPropagation();
             container.classList.remove('drag-over');
+
+            // Record drop time to prevent click event immediately after drop
+            this.lastDragEndTime = Date.now();
 
             // Internal file/folder move to root
             if (e.dataTransfer.types.includes('application/json')) {
@@ -355,6 +477,7 @@ export class FileExplorer {
             }
 
             element.classList.add('dragging');
+            this.isDragging = true;
         });
 
         element.addEventListener('dragend', (_e) => {
@@ -362,6 +485,9 @@ export class FileExplorer {
             document.querySelectorAll('.drag-over').forEach((el) => {
                 el.classList.remove('drag-over');
             });
+            // Record drag end time to prevent click event immediately after drag
+            this.lastDragEndTime = Date.now();
+            this.isDragging = false;
         });
     }
 
@@ -394,6 +520,9 @@ export class FileExplorer {
             e.preventDefault();
             e.stopPropagation();
             element.classList.remove('drag-over');
+
+            // Record drop time to prevent click event immediately after drop
+            this.lastDragEndTime = Date.now();
 
             // Internal file/folder move
             if (e.dataTransfer.types.includes('application/json')) {

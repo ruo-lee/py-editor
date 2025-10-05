@@ -64,8 +64,8 @@ export class EditorInitializer {
         if (welcomePage) {
             welcomePage.remove();
         }
-        // Show Monaco editor
-        if (this.context.editor) {
+        // Show Monaco editor (only if editor exists)
+        if (this.context.editor && this.context.editor.getDomNode()) {
             this.context.editor.getDomNode().style.display = 'block';
         }
     }
