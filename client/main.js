@@ -917,23 +917,21 @@ class PythonIDE {
         // Check if multiple items are selected
         if (this.fileExplorerInstance.selectedItems.length > 1) {
             // Delete multiple items
-            const itemNames = this.fileExplorerInstance.selectedItems
-                .map((item) => item.path.split('/').pop())
-                .join(', ');
+            const items = [...this.fileExplorerInstance.selectedItems]; // 배열 복사
+            const itemNames = items.map((item) => item.path.split('/').pop()).join(', ');
 
-            if (
-                !confirm(
-                    `${this.fileExplorerInstance.selectedItems.length}개 항목을 삭제하시겠습니까?\n\n${itemNames}`
-                )
-            ) {
+            if (!confirm(`${items.length}개 항목을 삭제하시겠습니까?\n\n${itemNames}`)) {
                 return;
             }
 
             // Save expanded folder states
             const expandedFolders = this.fileExplorerInstance.getExpandedFolders();
 
+            // Clear selection before deleting to prevent interference
+            this.fileExplorerInstance.clearSelection();
+
             // Delete all items without individual confirmation
-            for (const item of this.fileExplorerInstance.selectedItems) {
+            for (const item of items) {
                 await this.fileOpsAdvanced.deleteItem(item.path, item.type, true);
             }
 

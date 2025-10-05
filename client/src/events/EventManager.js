@@ -120,7 +120,12 @@ export class EventManager {
                 e.key === 'Delete' || (e.key === 'Backspace' && (e.metaKey || e.ctrlKey));
 
             if (isDeleteKey) {
-                if (this.context.selectedItem) {
+                // Check if we have any selected items in file explorer
+                if (
+                    this.context.fileExplorerInstance &&
+                    this.context.fileExplorerInstance.selectedItems &&
+                    this.context.fileExplorerInstance.selectedItems.length > 0
+                ) {
                     const activeElement = document.activeElement;
 
                     // Check if we're in any input field (but NOT Monaco editor)
@@ -130,10 +135,9 @@ export class EventManager {
                     // Allow deletion unless we're in a text input field
                     if (!isInInput) {
                         e.preventDefault();
-                        this.context.deleteItem(
-                            this.context.selectedItem.path,
-                            this.context.selectedItem.type
-                        );
+                        // Pass the first selected item (deleteItem will check selectedItems array internally)
+                        const firstItem = this.context.fileExplorerInstance.selectedItems[0];
+                        this.context.deleteItem(firstItem.path, firstItem.type);
                     }
                 }
             }

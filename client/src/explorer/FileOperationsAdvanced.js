@@ -62,6 +62,17 @@ export class FileOperationsAdvanced {
                 this.context.closeTab(path);
             }
 
+            // Close all tabs in folder if folder is deleted
+            if (type === 'folder') {
+                const tabsToClose = [];
+                for (const tabPath of this.context.openTabs.keys()) {
+                    if (tabPath.startsWith(path + '/')) {
+                        tabsToClose.push(tabPath);
+                    }
+                }
+                tabsToClose.forEach((tabPath) => this.context.closeTab(tabPath));
+            }
+
             // Clear selected directory if it was deleted or is a child of deleted directory
             if (
                 this.context.selectedDirectory === path ||

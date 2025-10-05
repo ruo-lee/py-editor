@@ -220,10 +220,13 @@ export class UnifiedTabManager {
             // User can click on editor area to focus when needed
         }
 
-        // Clear file explorer selection (multi-select 'selected' class)
+        // Clear file explorer visual selection (CSS class only)
         // This prevents multiple files from appearing highlighted
-        if (this.context.fileExplorerInstance && this.context.fileExplorerInstance.clearSelection) {
-            this.context.fileExplorerInstance.clearSelection();
+        // But preserves selectedItems array for multi-select operations
+        if (this.context.fileExplorerInstance) {
+            document.querySelectorAll('.file-item.selected').forEach((el) => {
+                el.classList.remove('selected');
+            });
         }
 
         // Update active file highlighting in explorer
