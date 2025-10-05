@@ -151,6 +151,11 @@ export class SplitViewManager {
             this.context.improvedLSP.refreshShortcuts();
         }
 
+        // Initialize FormatManager for right editor
+        if (this.context.formatManager && this.context.formatManager.initializeRightEditor) {
+            this.context.formatManager.initializeRightEditor();
+        }
+
         // Update button icon
         this.context.updateSplitButtonIcon();
     }

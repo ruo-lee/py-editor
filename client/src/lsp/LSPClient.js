@@ -469,8 +469,13 @@ export class LSPClient {
                         // Handle both workspace and stdlib file URIs
                         let filePath;
                         if (location.uri.startsWith('file:///app/workspace/')) {
-                            // Workspace file - remove the workspace prefix
-                            filePath = location.uri.replace('file:///app/workspace/', '');
+                            // Workspace file - remove the workspace prefix and decode URI components
+                            const encodedPath = location.uri.replace('file:///app/workspace/', '');
+                            // Decode each path component to handle non-ASCII filenames (e.g., Korean)
+                            filePath = encodedPath
+                                .split('/')
+                                .map((component) => decodeURIComponent(component))
+                                .join('/');
                         } else if (location.uri.startsWith('file://')) {
                             // Other file (like stdlib) - remove file:// protocol
                             filePath = location.uri.replace('file://', '');
@@ -584,6 +589,18 @@ export class LSPClient {
 
         const fileUri = this.getFileUri(filePath);
 
+        // Track opened documents to avoid duplicate didOpen notifications
+        if (!this.openedDocuments) {
+            this.openedDocuments = new Set();
+        }
+
+        // Only send didOpen if not already opened
+        if (this.openedDocuments.has(fileUri)) {
+            return; // Already opened, skip
+        }
+
+        this.openedDocuments.add(fileUri);
+
         this.sendRequest({
             jsonrpc: '2.0',
             method: 'textDocument/didOpen',
@@ -653,6 +670,11 @@ export class LSPClient {
 
         const fileUri = this.getFileUri(filePath);
 
+        // Remove from opened documents tracking
+        if (this.openedDocuments) {
+            this.openedDocuments.delete(fileUri);
+        }
+
         this.sendRequest({
             jsonrpc: '2.0',
             method: 'textDocument/didClose',
@@ -680,7 +702,29 @@ export class LSPClient {
         // Workspace files: add /app/workspace/ prefix
         // Remove leading slash to avoid double slashes
         const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-        return `file:///app/workspace/${normalizedPath}`;
+
+        // Encode path components for LSP (needed for non-ASCII characters like Korean)
+        // LSP uses encoded URIs as document keys
+        // IMPORTANT: Only encode once - LSP expects URI-encoded format, not double-encoded
+        const encodedPath = normalizedPath
+            .split('/')
+            .map((component) => {
+                // Check if already encoded (to avoid double encoding)
+                try {
+                    const decoded = decodeURIComponent(component);
+                    // If decoding changes it, it's already encoded - use as is
+                    if (decoded !== component) {
+                        return component;
+                    }
+                } catch (e) {
+                    // Decoding failed, probably not encoded
+                }
+                // Not encoded - encode it now
+                return encodeURIComponent(component);
+            })
+            .join('/');
+
+        return `file:///app/workspace/${encodedPath}`;
     }
 
     /**

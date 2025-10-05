@@ -34,16 +34,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python IDE</title>
-  <script type="module" crossorigin src="/assets/index-9fe6bae2.js"></script>
+  <script type="module" crossorigin src="/assets/index-e6a6fb18.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/monaco-editor-4fbb514b.js">
   <link rel="stylesheet" href="/assets/monaco-editor-39af074f.css">
-  <link rel="stylesheet" href="/assets/index-ab819122.css">
+  <link rel="stylesheet" href="/assets/index-ad7ebaca.css">
 </head>
 <body>
     <div id="app">
         <div class="header">
             <span class="app-title">PyEditor</span>
             <div class="header-actions">
+                <button class="header-btn" id="formatBtn" title="Format Document (Shift+Alt+F)" style="display: none;">
+                    <i class="codicon codicon-symbol-keyword"></i>
+                </button>
+                <button class="header-btn" id="typeCheckBtn" title="Toggle Type Checking">
+                    <i class="codicon codicon-type-hierarchy"></i>
+                </button>
                 <button class="header-btn" id="apiToggleBtn" title="API Request">
                     <i class="codicon codicon-globe"></i>
                 </button>

@@ -30,8 +30,13 @@ export class LSPResponseHandlers {
                         // Handle both workspace and stdlib file URIs
                         let filePath;
                         if (location.uri.startsWith('file:///app/workspace/')) {
-                            // Workspace file - remove the workspace prefix
-                            filePath = location.uri.replace('file:///app/workspace/', '');
+                            // Workspace file - remove the workspace prefix and decode URI components
+                            const encodedPath = location.uri.replace('file:///app/workspace/', '');
+                            // Decode each path component to handle non-ASCII filenames (e.g., Korean)
+                            filePath = encodedPath
+                                .split('/')
+                                .map((component) => decodeURIComponent(component))
+                                .join('/');
                         } else if (location.uri.startsWith('file://')) {
                             // Other file (like stdlib) - remove file:// protocol
                             filePath = location.uri.replace('file://', '');

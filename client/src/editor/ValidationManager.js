@@ -25,28 +25,7 @@ export class ValidationManager {
             });
         }
 
-        // Register document formatting provider
-        monaco.languages.registerDocumentFormattingEditProvider('python', {
-            provideDocumentFormattingEdits: (model) => {
-                // Basic Python formatting
-                const value = model.getValue();
-                const lines = value.split('\\n');
-                const formatted = lines.map((line) => {
-                    // Basic indentation fixes
-                    return line.replace(/^\\s+/, (match) => {
-                        const spaces = match.length;
-                        const tabs = Math.floor(spaces / 4);
-                        return '    '.repeat(tabs);
-                    });
-                });
-
-                return [
-                    {
-                        range: model.getFullModelRange(),
-                        text: formatted.join('\\n'),
-                    },
-                ];
-            },
-        });
+        // Note: Document formatting is now handled by LSPProviderManager
+        // which registers a provider that uses the Black formatter via LSP
     }
 }

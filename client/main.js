@@ -26,6 +26,8 @@ import { TabDragDropManager } from './src/tabs/TabDragDropManager.js';
 import { ModelSyncManager } from './src/sync/ModelSyncManager.js';
 import { WorkspaceManager } from './src/ui/WorkspaceManager.js';
 import { TemplateSelector } from './src/ui/TemplateSelector.js';
+import { FormatManager } from './src/editor/FormatManager.js';
+import { TypeCheckManager } from './src/editor/TypeCheckManager.js';
 import { getFileIcon } from './src/utils/fileIcons.js';
 import {
     closeAllDialogs,
@@ -94,6 +96,8 @@ class PythonIDE {
         this.dialogManager = new DialogManager();
         this.codeExecutor = new CodeExecutor(this);
         this.contextMenuInstance = new ContextMenu();
+        this.formatManager = new FormatManager(this);
+        this.typeCheckManager = new TypeCheckManager(this);
 
         // Apply theme after ThemeManager is initialized
         this.applyTheme(this.currentTheme);
@@ -218,6 +222,10 @@ class PythonIDE {
             // Setup improved LSP integration with validation and Find References
             this.improvedLSP = new ImprovedLSPIntegration(this);
             this.improvedLSP.setup();
+
+            // Initialize format and type check managers after LSP is connected
+            this.formatManager.initialize();
+            this.typeCheckManager.initialize();
         };
 
         // Keep reference to languageClient for backward compatibility
@@ -546,6 +554,11 @@ class PythonIDE {
                 this.activeFile = null;
                 this.editor.setModel(null);
                 this.executeButton.style.display = 'none';
+
+                // Hide format button when no files are open
+                if (this.formatManager) {
+                    this.formatManager.updateVisibility(false);
+                }
             }
         }
     }
@@ -574,6 +587,11 @@ class PythonIDE {
                     const isPython = filepath.endsWith('.py');
                     this.executeButton.style.display =
                         isPython && !tabData.isStdlib ? 'block' : 'none';
+
+                    // Update format button visibility
+                    if (this.formatManager) {
+                        this.formatManager.updateVisibility(isPython && !tabData.isStdlib);
+                    }
 
                     // Hide references panel when switching tabs (UX improvement)
                     if (this.referencesPanel) {

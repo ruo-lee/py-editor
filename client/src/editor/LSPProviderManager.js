@@ -17,6 +17,7 @@ export class LSPProviderManager {
         this.registerDefinitionProvider();
         this.registerHoverProvider();
         this.registerReferenceProvider();
+        this.registerFormattingProvider();
     }
 
     /**
@@ -305,5 +306,120 @@ export class LSPProviderManager {
                 }
             },
         });
+    }
+
+    /**
+     * Register Document Formatting Provider for Black formatter via LSP
+     */
+    registerFormattingProvider() {
+        monaco.languages.registerDocumentFormattingEditProvider('python', {
+            provideDocumentFormattingEdits: async (model, options, token) => {
+                try {
+                    // Determine which editor this model belongs to
+                    const editorSide = this.getEditorSide(model);
+                    const filePath =
+                        editorSide === 'right'
+                            ? this.context.rightActiveFile
+                            : this.context.activeFile;
+
+                    if (!filePath || !this.context.lspClientInstance?.isConnected()) {
+                        console.log('LSP not connected or no active file');
+                        return null;
+                    }
+
+                    const content = model.getValue();
+
+                    // Ensure document is synchronized with LSP (sends didOpen if needed)
+                    if (this.context.lspManager) {
+                        await this.context.lspManager.ensureDocumentSynchronized(filePath, content);
+                    }
+
+                    const fileUri = this.getFileUri(filePath);
+
+                    // Send formatting request to LSP
+                    const formatRequest = {
+                        jsonrpc: '2.0',
+                        id: this.context.lspClientInstance.messageId++,
+                        method: 'textDocument/formatting',
+                        params: {
+                            textDocument: { uri: fileUri },
+                            options: {
+                                tabSize: options.tabSize,
+                                insertSpaces: options.insertSpaces,
+                            },
+                        },
+                    };
+
+                    return new Promise((resolve) => {
+                        // Store resolver for this request
+                        const requestId = formatRequest.id;
+                        const pendingRequests = this.context.lspClientInstance.pendingRequests;
+
+                        // Create a temporary response handler
+                        const originalHandler = this.context.lspClientInstance.handleResponse.bind(
+                            this.context.lspClientInstance
+                        );
+
+                        this.context.lspClientInstance.handleResponse = (response) => {
+                            if (response.id === requestId) {
+                                // Restore original handler
+                                this.context.lspClientInstance.handleResponse = originalHandler;
+
+                                if (response.result && Array.isArray(response.result)) {
+                                    // Convert LSP TextEdit[] to Monaco ITextEdit[]
+                                    const edits = response.result.map((edit) => ({
+                                        range: {
+                                            startLineNumber: edit.range.start.line + 1,
+                                            startColumn: edit.range.start.character + 1,
+                                            endLineNumber: edit.range.end.line + 1,
+                                            endColumn: edit.range.end.character + 1,
+                                        },
+                                        text: edit.newText,
+                                    }));
+                                    resolve(edits);
+                                } else {
+                                    console.log('No formatting edits returned');
+                                    resolve(null);
+                                }
+                            } else {
+                                // Pass to original handler
+                                originalHandler(response);
+                            }
+                        };
+
+                        // Send request
+                        this.context.lspClientInstance.sendRequest(formatRequest);
+                        pendingRequests.set(requestId, formatRequest);
+
+                        // Timeout after 5 seconds
+                        setTimeout(() => {
+                            this.context.lspClientInstance.handleResponse = originalHandler;
+                            resolve(null);
+                        }, 5000);
+                    });
+                } catch (error) {
+                    console.error('Formatting provider error:', error);
+                    return null;
+                }
+            },
+        });
+    }
+
+    /**
+     * Get file URI for LSP requests
+     */
+    getFileUri(filePath) {
+        if (!filePath) return 'file:///app/workspace/temp.py';
+
+        // Remove leading slash to avoid double slashes
+        const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+
+        // Encode path components for LSP (needed for non-ASCII characters like Korean)
+        const encodedPath = normalizedPath
+            .split('/')
+            .map((component) => encodeURIComponent(component))
+            .join('/');
+
+        return `file:///app/workspace/${encodedPath}`;
     }
 }
