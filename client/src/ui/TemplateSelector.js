@@ -45,6 +45,16 @@ export class TemplateSelector {
         // 기존 템플릿 선택기 제거
         this.hide(targetEditor);
 
+        // 뒤에 있는 Monaco Editor를 완전히 비활성화
+        const monacoEditor = targetEditor === 'right' ? this.ide.rightEditor : this.ide.editor;
+        if (monacoEditor) {
+            const domNode = monacoEditor.getDomNode();
+            if (domNode) {
+                domNode.style.pointerEvents = 'none';
+                domNode.style.userSelect = 'none';
+            }
+        }
+
         // 템플릿 선택 패널 생성
         const panel = this.createPanel(targetEditor);
         editorContainer.appendChild(panel);
@@ -72,6 +82,16 @@ export class TemplateSelector {
         if (this.previewEditors[targetEditor]) {
             this.previewEditors[targetEditor].dispose();
             delete this.previewEditors[targetEditor];
+        }
+
+        // 뒤에 있는 Monaco Editor 다시 활성화
+        const monacoEditor = targetEditor === 'right' ? this.ide.rightEditor : this.ide.editor;
+        if (monacoEditor) {
+            const domNode = monacoEditor.getDomNode();
+            if (domNode) {
+                domNode.style.pointerEvents = '';
+                domNode.style.userSelect = '';
+            }
         }
 
         const existingPanel = editorContainer.querySelector('.template-selector-panel');
@@ -170,6 +190,12 @@ export class TemplateSelector {
      * 이벤트 리스너 설정
      */
     setupEventListeners(panel, targetEditor) {
+        // 패널 내부 클릭 시 이벤트 전파 차단 (Monaco가 포커스 가져가는 것 방지)
+        const container = panel.querySelector('.template-selector-container');
+        container.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
         // 닫기 버튼 클릭
         const closeBtn = panel.querySelector('.template-close-btn');
         closeBtn.addEventListener('click', () => {
@@ -199,6 +225,16 @@ export class TemplateSelector {
             if (e.key === 'Enter') {
                 this.createFile(targetEditor);
             }
+        });
+
+        // 입력창 포커스 유지
+        nameInput.addEventListener('blur', (e) => {
+            // container 내부 요소로 포커스가 이동하는 경우가 아니면 다시 포커스
+            setTimeout(() => {
+                if (!container.contains(document.activeElement)) {
+                    nameInput.focus();
+                }
+            }, 0);
         });
 
         // ESC 키로 취소 (전역)

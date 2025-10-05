@@ -46,45 +46,55 @@ export class FileOperationsAdvanced {
         }
     }
 
-    async deleteItem(filePath, type) {
-        await this.context.dialogManager.showDeleteConfirmation(
-            filePath,
-            type,
-            async (path, type) => {
-                const response = await fetch(this.context.buildUrl(`/api/files/${path}`), {
-                    method: 'DELETE',
-                    headers: this.context.getFetchHeaders(),
-                });
+    async deleteItem(filePath, type, skipConfirmation = false) {
+        const performDelete = async (path, type) => {
+            const response = await fetch(this.context.buildUrl(`/api/files/${path}`), {
+                method: 'DELETE',
+                headers: this.context.getFetchHeaders(),
+            });
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete item');
-                }
-
-                // Close tab if file is open
-                if (type === 'file' && this.context.openTabs.has(path)) {
-                    this.context.closeTab(path);
-                }
-
-                // Clear selected directory if it was deleted or is a child of deleted directory
-                if (
-                    this.context.selectedDirectory === path ||
-                    this.context.selectedDirectory.startsWith(path + '/')
-                ) {
-                    this.context.selectedDirectory = '';
-                }
-            },
-            async () => {
-                // Save expanded folder states before reloading
-                const expandedFolders = this.context.fileExplorerInstance.getExpandedFolders();
-
-                await this.context.loadFileExplorer();
-
-                // Restore expanded folders after a short delay
-                setTimeout(() => {
-                    this.context.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
-                }, 100);
+            if (!response.ok) {
+                throw new Error('Failed to delete item');
             }
-        );
+
+            // Close tab if file is open
+            if (type === 'file' && this.context.openTabs.has(path)) {
+                this.context.closeTab(path);
+            }
+
+            // Clear selected directory if it was deleted or is a child of deleted directory
+            if (
+                this.context.selectedDirectory === path ||
+                this.context.selectedDirectory.startsWith(path + '/')
+            ) {
+                this.context.selectedDirectory = '';
+            }
+        };
+
+        const afterDelete = async () => {
+            // Save expanded folder states before reloading
+            const expandedFolders = this.context.fileExplorerInstance.getExpandedFolders();
+
+            await this.context.loadFileExplorer();
+
+            // Restore expanded folders after a short delay
+            setTimeout(() => {
+                this.context.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
+            }, 100);
+        };
+
+        if (skipConfirmation) {
+            // Skip confirmation and delete directly
+            await performDelete(filePath, type);
+        } else {
+            // Show confirmation dialog
+            await this.context.dialogManager.showDeleteConfirmation(
+                filePath,
+                type,
+                performDelete,
+                afterDelete
+            );
+        }
     }
 
     async moveItem(oldPath, newPath) {

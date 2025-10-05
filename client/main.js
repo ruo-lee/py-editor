@@ -923,7 +923,7 @@ class PythonIDE {
 
             if (
                 !confirm(
-                    `Delete ${this.fileExplorerInstance.selectedItems.length} items (${itemNames})?`
+                    `${this.fileExplorerInstance.selectedItems.length}개 항목을 삭제하시겠습니까?\n\n${itemNames}`
                 )
             ) {
                 return;
@@ -932,8 +932,9 @@ class PythonIDE {
             // Save expanded folder states
             const expandedFolders = this.fileExplorerInstance.getExpandedFolders();
 
+            // Delete all items without individual confirmation
             for (const item of this.fileExplorerInstance.selectedItems) {
-                await this.fileOpsAdvanced.deleteItem(item.path, item.type);
+                await this.fileOpsAdvanced.deleteItem(item.path, item.type, true);
             }
 
             // Reload and restore
@@ -942,8 +943,8 @@ class PythonIDE {
                 this.fileExplorerInstance.restoreExpandedFolders(expandedFolders);
             }, 100);
         } else {
-            // Delete single item
-            await this.fileOpsAdvanced.deleteItem(filePath, type);
+            // Delete single item with confirmation
+            await this.fileOpsAdvanced.deleteItem(filePath, type, false);
         }
     }
 
