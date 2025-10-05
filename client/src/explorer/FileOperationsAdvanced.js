@@ -109,15 +109,7 @@ export class FileOperationsAdvanced {
     }
 
     async moveItem(oldPath, newPath) {
-        console.log('[DEBUG moveItem] Starting move from', oldPath, 'to', newPath);
-
         // Use the /api/move endpoint for both files and folders
-        console.log(
-            '[DEBUG moveItem] Calling /api/move with sourcePath:',
-            oldPath,
-            'targetPath:',
-            newPath
-        );
         const response = await fetch(this.context.buildUrl('/api/move'), {
             method: 'POST',
             headers: this.context.getFetchHeaders(),
@@ -129,11 +121,8 @@ export class FileOperationsAdvanced {
 
         if (!response.ok) {
             const error = await response.json();
-            console.error('[DEBUG moveItem] Move failed:', error);
             throw new Error(error.error || 'Failed to move item');
         }
-
-        console.log('[DEBUG moveItem] Server responded OK');
 
         // Update selected directory if it was moved
         if (this.context.selectedDirectory === oldPath) {
@@ -149,13 +138,6 @@ export class FileOperationsAdvanced {
         const isOpenInLeft = this.context.openTabs.has(oldPath);
         const isOpenInRight = this.context.rightOpenTabs && this.context.rightOpenTabs.has(oldPath);
 
-        console.log(
-            '[DEBUG moveItem] File open status - Left:',
-            isOpenInLeft,
-            'Right:',
-            isOpenInRight
-        );
-
         // Get model once before any disposal
         let oldModel = null;
         let content = null;
@@ -165,34 +147,20 @@ export class FileOperationsAdvanced {
             oldModel = this.context.openTabs.get(oldPath).model;
             content = oldModel.getValue();
             language = oldModel.getLanguageId();
-            console.log(
-                '[DEBUG moveItem] Retrieved model content length:',
-                content.length,
-                'language:',
-                language
-            );
         } else if (isOpenInRight) {
             oldModel = this.context.rightOpenTabs.get(oldPath).model;
             content = oldModel.getValue();
             language = oldModel.getLanguageId();
-            console.log(
-                '[DEBUG moveItem] Retrieved model from right editor, content length:',
-                content.length,
-                'language:',
-                language
-            );
         }
 
         // Create new model once if file is open anywhere
         let newModel = null;
         if (oldModel) {
             newModel = monaco.editor.createModel(content, language, monaco.Uri.file(newPath));
-            console.log('[DEBUG moveItem] Created new model with URI:', newPath);
         }
 
         // Update left editor if file is open
         if (isOpenInLeft) {
-            console.log('[DEBUG moveItem] Updating left editor from', oldPath, 'to', newPath);
             const tabData = this.context.openTabs.get(oldPath);
 
             // Update tab data
@@ -202,16 +170,13 @@ export class FileOperationsAdvanced {
                 model: newModel,
             });
             this.context.activeFile = newPath;
-            console.log('[DEBUG moveItem] Updated activeFile to:', this.context.activeFile);
 
             // Update editor model
             this.context.editor.setModel(newModel);
-            console.log('[DEBUG moveItem] Set editor model to new model');
 
             // Notify LSP: close old file, open new file
             this.context.notifyDocumentClosed(oldPath);
             this.context.notifyDocumentOpened(newPath, content);
-            console.log('[DEBUG moveItem] Notified LSP: closed', oldPath, 'opened', newPath);
 
             // Update tab display
             const tab = document.querySelector(
@@ -230,7 +195,6 @@ export class FileOperationsAdvanced {
 
         // Update right editor if file is open
         if (isOpenInRight) {
-            console.log('[DEBUG moveItem] Updating right editor from', oldPath, 'to', newPath);
             const tabData = this.context.rightOpenTabs.get(oldPath);
 
             // Update tab data
@@ -242,16 +206,11 @@ export class FileOperationsAdvanced {
 
             if (this.context.rightActiveFile === oldPath) {
                 this.context.rightActiveFile = newPath;
-                console.log(
-                    '[DEBUG moveItem] Updated rightActiveFile to:',
-                    this.context.rightActiveFile
-                );
             }
 
             // Update right editor model if this file is currently active
             if (this.context.rightEditor && this.context.rightActiveFile === newPath) {
                 this.context.rightEditor.setModel(newModel);
-                console.log('[DEBUG moveItem] Set right editor model to new model');
             }
 
             // Update tab display for right editor
@@ -272,7 +231,6 @@ export class FileOperationsAdvanced {
         // Dispose old model only after both editors are updated
         if (oldModel) {
             oldModel.dispose();
-            console.log('[DEBUG moveItem] Disposed old model');
         }
 
         // Update file path display bars for both editors (always update if file is active)
@@ -280,7 +238,6 @@ export class FileOperationsAdvanced {
             const filePathBar = document.getElementById('filePathBar');
             if (filePathBar && this.context.updateFilePathDisplayForElement) {
                 this.context.updateFilePathDisplayForElement(filePathBar, newPath, false);
-                console.log('[DEBUG moveItem] Updated left file path bar to:', newPath);
             }
         }
 
@@ -288,7 +245,6 @@ export class FileOperationsAdvanced {
             const rightFilePathBar = document.getElementById('filePathBar2');
             if (rightFilePathBar && this.context.updateFilePathDisplayForElement) {
                 this.context.updateFilePathDisplayForElement(rightFilePathBar, newPath, false);
-                console.log('[DEBUG moveItem] Updated right file path bar to:', newPath);
             }
         }
     }

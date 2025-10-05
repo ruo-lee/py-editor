@@ -49,8 +49,6 @@ export class FileUploadManager {
                 // Move the file - this will automatically update openTabs and tab UI
                 await this.context.moveItem(draggedItem.path, newPath);
 
-                console.log('[DEBUG] File moved from', draggedItem.path, 'to', newPath);
-
                 // Wait a bit for the file system to settle
                 await new Promise((resolve) => setTimeout(resolve, 100));
 

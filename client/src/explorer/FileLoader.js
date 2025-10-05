@@ -130,9 +130,6 @@ export class FileLoader {
                 );
             }
 
-            console.log('[DEBUG] FileLoader: Adding to openTabs:', filepath);
-            console.trace('[DEBUG] FileLoader: Stack trace');
-
             this.context.openTabs.set(filepath, {
                 model,
                 saved: true,
@@ -145,9 +142,7 @@ export class FileLoader {
             }
 
             // Use TabManager to create and switch to tab
-            console.log('[DEBUG] FileLoader: Calling openTab for:', filepath);
             this.context.tabManager.openTab(filepath, isStdlib);
-            console.log('[DEBUG] FileLoader: openTab completed for:', filepath);
         } catch (error) {
             console.error('Failed to open file:', error);
             // Show user-friendly error message

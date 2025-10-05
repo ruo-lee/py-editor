@@ -221,13 +221,11 @@ export class FileExplorer {
 
             // Ignore click if currently dragging or just finished dragging
             if (this.isDragging) {
-                console.log('[DEBUG] Click ignored - currently dragging');
                 return;
             }
 
             const timeSinceDrag = Date.now() - this.lastDragEndTime;
             if (timeSinceDrag < 300) {
-                console.log('[DEBUG] Click ignored - only', timeSinceDrag, 'ms since drag end');
                 return;
             }
 
@@ -250,7 +248,6 @@ export class FileExplorer {
                 this.lastClickedItem = item;
 
                 // Open file but keep focus on explorer for keyboard shortcuts
-                console.log('[DEBUG] File click opening file:', item.path);
                 this.onFileClick(item.path);
             }
         });
@@ -404,7 +401,6 @@ export class FileExplorer {
 
             // Record drop time to prevent click event immediately after drop
             this.lastDragEndTime = Date.now();
-            console.log('[DEBUG] Drop to root occurred at', this.lastDragEndTime);
 
             // Internal file/folder move to root
             if (e.dataTransfer.types.includes('application/json')) {
@@ -482,7 +478,6 @@ export class FileExplorer {
 
             element.classList.add('dragging');
             this.isDragging = true;
-            console.log('[DEBUG] Drag started');
         });
 
         element.addEventListener('dragend', (_e) => {
@@ -493,7 +488,6 @@ export class FileExplorer {
             // Record drag end time to prevent click event immediately after drag
             this.lastDragEndTime = Date.now();
             this.isDragging = false;
-            console.log('[DEBUG] Drag ended at', this.lastDragEndTime);
         });
     }
 
@@ -529,7 +523,6 @@ export class FileExplorer {
 
             // Record drop time to prevent click event immediately after drop
             this.lastDragEndTime = Date.now();
-            console.log('[DEBUG] Drop occurred at', this.lastDragEndTime);
 
             // Internal file/folder move
             if (e.dataTransfer.types.includes('application/json')) {
