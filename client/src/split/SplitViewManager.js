@@ -259,12 +259,39 @@ export class SplitViewManager {
     closeSplitView(mergeTabsToLeft = true) {
         if (!this.context.splitViewActive) return;
 
+        // Cleanup all model sync listeners before closing
+        this.context.modelSyncManager.cleanupAllSyncListeners();
+
         // Merge right tabs to left by default
         if (mergeTabsToLeft && this.context.rightOpenTabs.size > 0) {
-            this.context.rightOpenTabs.forEach((tabData, filepath) => {
+            this.context.rightOpenTabs.forEach((rightTabData, filepath) => {
                 if (!this.context.openTabs.has(filepath)) {
-                    this.context.openTabs.set(filepath, tabData);
-                    this.context.tabManager.openTab(filepath, tabData.isStdlib);
+                    // File only exists in right - move it to left
+                    this.context.openTabs.set(filepath, rightTabData);
+                    this.context.tabManager.openTab(filepath, rightTabData.isStdlib);
+                } else {
+                    // File exists in both - sync content from right to left before disposing
+                    const leftTabData = this.context.openTabs.get(filepath);
+                    if (leftTabData && leftTabData.model && rightTabData.model) {
+                        // Copy content from right to left
+                        const rightContent = rightTabData.model.getValue();
+                        if (leftTabData.model.getValue() !== rightContent) {
+                            leftTabData.model.setValue(rightContent);
+                        }
+                    }
+
+                    // Dispose the right model to avoid memory leak
+                    if (rightTabData.model) {
+                        rightTabData.model.dispose();
+                    }
+                }
+            });
+        } else {
+            // Not merging - just dispose right models
+            this.context.rightOpenTabs.forEach((rightTabData, filepath) => {
+                // If this file is open in both, dispose the right model
+                if (this.context.openTabs.has(filepath) && rightTabData.model) {
+                    rightTabData.model.dispose();
                 }
             });
         }
@@ -341,19 +368,47 @@ export class SplitViewManager {
             return;
         }
 
-        // Check if file is already open in left editor - if so, share the model
+        // Check if file is already open in left editor
         if (this.context.openTabs.has(filepath)) {
-            const tabData = this.context.openTabs.get(filepath);
-            this.context.rightOpenTabs.set(filepath, tabData); // Share the same model
+            const leftTabData = this.context.openTabs.get(filepath);
+
+            // Create a separate model for right editor to avoid undo stack corruption
+            // The models will be synced via ModelSyncManager
+            const isStdlib = leftTabData.isStdlib;
+            const modelUri = isStdlib
+                ? monaco.Uri.parse(`stdlib://${filepath}_right`)
+                : monaco.Uri.file(`${filepath}_right`);
+
+            // Check if right model already exists
+            let rightModel = monaco.editor.getModel(modelUri);
+
+            if (!rightModel) {
+                // Create separate model with same content
+                rightModel = monaco.editor.createModel(
+                    leftTabData.model.getValue(),
+                    leftTabData.model.getLanguageId(),
+                    modelUri
+                );
+            }
+
+            // Store in right tabs with separate model
+            this.context.rightOpenTabs.set(filepath, {
+                model: rightModel,
+                saved: leftTabData.saved,
+                isStdlib: isStdlib,
+            });
 
             if (this.context.rightTabManager) {
-                this.context.rightTabManager.openTab(filepath, tabData.isStdlib);
+                this.context.rightTabManager.openTab(filepath, isStdlib);
 
-                // Explicitly set the model on the right editor
-                if (this.context.rightEditor && tabData.model) {
-                    this.context.rightEditor.setModel(tabData.model);
+                // Set the separate model on the right editor
+                if (this.context.rightEditor && rightModel) {
+                    this.context.rightEditor.setModel(rightModel);
                 }
             }
+
+            // Setup model sync between left and right
+            this.context.setupModelSync(filepath);
 
             // Update placeholder visibility
             this.updatePlaceholderVisibility();
