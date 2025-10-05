@@ -130,7 +130,7 @@ class PythonIDE {
                 this.selectedDirectory = path;
                 this.selectedItem = { path, type: 'directory' };
             },
-            onContextMenu: (e, item) => this.showContextMenu(e, item),
+            onContextMenu: (e, filePath, type) => this.showContextMenu(e, filePath, type),
             onFileMove: (draggedItem, targetPath) => this.handleItemMove(draggedItem, targetPath),
             onExternalFileDrop: (files, targetPath, type) =>
                 this.handleExternalFileDrop(files, targetPath, type),

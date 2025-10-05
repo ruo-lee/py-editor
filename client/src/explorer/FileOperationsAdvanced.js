@@ -57,20 +57,43 @@ export class FileOperationsAdvanced {
                 throw new Error('Failed to delete item');
             }
 
-            // Close tab if file is open
+            // Close tab if file is open in left editor
             if (type === 'file' && this.context.openTabs.has(path)) {
-                this.context.closeTab(path);
+                this.context.tabManager.closeTab(path);
+            }
+
+            // Close tab if file is open in right editor
+            if (
+                type === 'file' &&
+                this.context.rightOpenTabs &&
+                this.context.rightOpenTabs.has(path)
+            ) {
+                this.context.rightTabManager?.closeTab(path);
             }
 
             // Close all tabs in folder if folder is deleted
             if (type === 'folder') {
-                const tabsToClose = [];
+                // Close tabs in left editor
+                const leftTabsToClose = [];
                 for (const tabPath of this.context.openTabs.keys()) {
                     if (tabPath.startsWith(path + '/')) {
-                        tabsToClose.push(tabPath);
+                        leftTabsToClose.push(tabPath);
                     }
                 }
-                tabsToClose.forEach((tabPath) => this.context.closeTab(tabPath));
+                leftTabsToClose.forEach((tabPath) => this.context.tabManager.closeTab(tabPath));
+
+                // Close tabs in right editor
+                if (this.context.rightOpenTabs && this.context.rightTabManager) {
+                    const rightTabsToClose = [];
+                    for (const tabPath of this.context.rightOpenTabs.keys()) {
+                        if (tabPath.startsWith(path + '/')) {
+                            rightTabsToClose.push(tabPath);
+                        }
+                    }
+                    rightTabsToClose.forEach((tabPath) =>
+                        this.context.rightTabManager.closeTab(tabPath)
+                    );
+                }
             }
 
             // Clear selected directory if it was deleted or is a child of deleted directory
@@ -95,7 +118,7 @@ export class FileOperationsAdvanced {
         };
 
         if (skipConfirmation) {
-            // Skip confirmation and delete directly
+            // Skip confirmation and delete directly (no refresh for batch operations)
             await performDelete(filePath, type);
         } else {
             // Show confirmation dialog

@@ -151,7 +151,7 @@ export class DialogManager {
 
         try {
             await onDelete(filePath, type);
-            onRefresh();
+            await onRefresh();
             return true;
         } catch (error) {
             alert('Failed to delete: ' + error.message);
