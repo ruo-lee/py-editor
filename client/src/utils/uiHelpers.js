@@ -58,13 +58,54 @@ export function updateActiveFileHighlight(
     const fileToHighlight = focusedEditor === 'right' ? rightActiveFilePath : activeFilePath;
 
     if (fileToHighlight) {
+        // Expand all parent directories to reveal the file
+        expandParentDirectories(fileToHighlight);
+
         const activeElement = document.querySelector(
             `[data-path="${fileToHighlight}"][data-type="file"]`
         );
         if (activeElement) {
             activeElement.classList.add('active');
+            // Scroll the file into view smoothly
+            activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }
+}
+
+/**
+ * Expand all parent directories of a file path
+ * @param {string} filepath - Full file path
+ */
+function expandParentDirectories(filepath) {
+    if (!filepath) return;
+
+    // Split path into parts and build all parent directory paths
+    const parts = filepath.split('/');
+    const parentPaths = [];
+
+    // Build cumulative paths for each parent directory
+    for (let i = 1; i < parts.length; i++) {
+        const parentPath = parts.slice(0, i).join('/');
+        if (parentPath) {
+            parentPaths.push(parentPath);
+        }
+    }
+
+    // Expand each parent directory from root to leaf
+    parentPaths.forEach((parentPath) => {
+        const dirElement = document.querySelector(
+            `[data-path="${parentPath}"][data-type="directory"]`
+        );
+        if (dirElement) {
+            const toggle = dirElement.querySelector('.folder-toggle');
+            const content = dirElement.nextElementSibling;
+
+            // Only expand if not already expanded
+            if (toggle && content && !content.classList.contains('expanded')) {
+                toggle.click();
+            }
+        }
+    });
 }
 
 /**
