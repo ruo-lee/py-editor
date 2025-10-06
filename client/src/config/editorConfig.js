@@ -54,6 +54,13 @@ export const WELCOME_HTML = `
                     </div>
                 </div>
                 <div class="welcome-tip">
+                    <i class="codicon codicon-globe welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">API Testing</div>
+                        <div class="welcome-tip-desc">Test HTTP APIs directly from the editor with the built-in API request panel</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
                     <i class="codicon codicon-split-horizontal welcome-tip-icon"></i>
                     <div class="welcome-tip-content">
                         <div class="welcome-tip-title">Split View</div>
@@ -61,17 +68,31 @@ export const WELCOME_HTML = `
                     </div>
                 </div>
                 <div class="welcome-tip">
-                    <i class="codicon codicon-color-mode welcome-tip-icon"></i>
-                    <div class="welcome-tip-content">
-                        <div class="welcome-tip-title">Switch Theme</div>
-                        <div class="welcome-tip-desc">Toggle between dark and light themes using the button in the top-right corner</div>
-                    </div>
-                </div>
-                <div class="welcome-tip">
                     <i class="codicon codicon-symbol-method welcome-tip-icon"></i>
                     <div class="welcome-tip-content">
                         <div class="welcome-tip-title">Code Intelligence</div>
                         <div class="welcome-tip-desc">Enjoy auto-completion, hover info, and go-to-definition with LSP support</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
+                    <i class="codicon codicon-symbol-keyword welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Code Formatting</div>
+                        <div class="welcome-tip-desc">Format your code with <span class="welcome-keyboard">Shift+Alt+F</span> or use the format button in the header</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
+                    <i class="codicon codicon-type-hierarchy welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Type Checking</div>
+                        <div class="welcome-tip-desc">Enable real-time type checking with mypy using the toggle button in the header</div>
+                    </div>
+                </div>
+                <div class="welcome-tip">
+                    <i class="codicon codicon-color-mode welcome-tip-icon"></i>
+                    <div class="welcome-tip-content">
+                        <div class="welcome-tip-title">Switch Theme</div>
+                        <div class="welcome-tip-desc">Toggle between dark and light themes using the button in the top-right corner</div>
                     </div>
                 </div>
             </div>

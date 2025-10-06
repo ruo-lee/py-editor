@@ -264,7 +264,9 @@ export class SplitViewManager {
 
         // Merge right tabs to left by default
         if (mergeTabsToLeft && this.context.rightOpenTabs.size > 0) {
-            this.context.rightOpenTabs.forEach((rightTabData, filepath) => {
+            const rightFiles = Array.from(this.context.rightOpenTabs.entries());
+
+            rightFiles.forEach(([filepath, rightTabData]) => {
                 if (!this.context.openTabs.has(filepath)) {
                     // File only exists in right - move it to left
                     this.context.openTabs.set(filepath, rightTabData);
@@ -286,6 +288,14 @@ export class SplitViewManager {
                     }
                 }
             });
+
+            // Switch to the last active file from right if no left file was active
+            if (!this.context.activeFile && this.context.rightActiveFile) {
+                const lastRightFile = this.context.rightActiveFile;
+                if (this.context.openTabs.has(lastRightFile)) {
+                    this.context.tabManager.switchTab(lastRightFile);
+                }
+            }
         } else {
             // Not merging - just dispose right models
             this.context.rightOpenTabs.forEach((rightTabData, filepath) => {
@@ -313,6 +323,7 @@ export class SplitViewManager {
         if (leftGroup) {
             leftGroup.id = '';
             leftGroup.classList.add('focused'); // Restore focus when closing split
+            leftGroup.style.width = ''; // Reset width to default
         }
 
         // Remove split view class
