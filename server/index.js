@@ -1,12 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { spawn } = require('child_process');
 const WebSocket = require('ws');
 
 // Import utilities
 const logger = require('./utils/logger');
 const { WORKSPACE_ROOT } = require('./utils/pathUtils');
+const { getLSPProcessPool } = require('./services/lspProcessPool');
 
 // Import routes
 const filesRouter = require('./routes/files');
@@ -33,8 +33,17 @@ app.use('/api', executionRouter);
 const server = require('http').createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// Initialize LSP process pool
+const lspPool = getLSPProcessPool({
+    maxProcesses: 20,
+    idleTimeout: 300000, // 5 minutes
+});
+
 wss.on('connection', (ws) => {
     logger.info('Language server client connected');
+
+    // Generate unique user ID for this connection
+    const userId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     let pylsp = null;
     let messageBuffer = '';
@@ -47,7 +56,7 @@ wss.on('connection', (ws) => {
         const now = Date.now();
         for (const [id, reqData] of pendingRequests.entries()) {
             if (typeof reqData === 'object' && now - reqData.timestamp > REQUEST_TIMEOUT) {
-                logger.debug('Removing stale request', { id, method: reqData.method });
+                logger.debug('Removing stale request', { id, method: reqData.method, userId });
                 pendingRequests.delete(id);
             }
         }
@@ -67,169 +76,193 @@ wss.on('connection', (ws) => {
             }
 
             if (data.method === 'initialize') {
-                // Start Python Language Server with proper configuration
-                try {
-                    pylsp = spawn('pylsp', ['-v'], {
-                        stdio: ['pipe', 'pipe', 'pipe'],
-                        cwd: WORKSPACE_ROOT,
-                        env: {
-                            ...process.env,
-                            PYTHONPATH:
-                                WORKSPACE_ROOT +
-                                ':/usr/local/lib/python3.11:/usr/local/lib/python3.11/site-packages',
-                            PYTHONHOME: '/usr/local',
-                        },
-                    });
+                // Get pylsp process from pool (reuse if available)
+                lspPool
+                    .getProcess(userId)
+                    .then((process) => {
+                        pylsp = process;
 
-                    pylsp.on('error', (error) => {
-                        logger.error('Failed to start pylsp', { error: error.message });
-                        // Send error response to client
+                        pylsp.on('error', (error) => {
+                            logger.error('Failed to start pylsp from pool', {
+                                userId,
+                                error: error.message,
+                            });
+                            // Send error response to client
+                            ws.send(
+                                JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    id: data.id,
+                                    error: {
+                                        code: -32099,
+                                        message:
+                                            'Python Language Server not available. Install pylsp with: pip install python-lsp-server',
+                                    },
+                                })
+                            );
+                        });
+
+                        // Setup stdout handler inside Promise
+                        pylsp.stdout.on('data', (chunk) => {
+                            try {
+                                messageBuffer += chunk.toString();
+
+                                // Memory optimization: limit buffer size to prevent memory bloat
+                                if (messageBuffer.length > MAX_BUFFER_SIZE) {
+                                    logger.warn(
+                                        'Message buffer exceeded limit, clearing old data',
+                                        {
+                                            bufferLength: messageBuffer.length,
+                                        }
+                                    );
+                                    // Keep only the last 100KB to avoid losing incomplete messages
+                                    messageBuffer = messageBuffer.slice(-100 * 1024);
+                                }
+
+                                logger.debug('Received chunk from pylsp', {
+                                    bufferLength: messageBuffer.length,
+                                });
+
+                                // Process complete LSP messages
+                                // eslint-disable-next-line no-constant-condition
+                                while (true) {
+                                    // Look for Content-Length header anywhere in the header section
+                                    const contentLengthMatch =
+                                        messageBuffer.match(/Content-Length:\s*(\d+)/);
+                                    if (!contentLengthMatch) {
+                                        logger.debug('No Content-Length header found yet');
+                                        break;
+                                    }
+
+                                    // Find the end of all headers (double newline)
+                                    const headerEndMatch = messageBuffer.match(/\r?\n\r?\n/);
+                                    if (!headerEndMatch) {
+                                        logger.debug('No complete header section found yet');
+                                        break;
+                                    }
+
+                                    const contentLength = parseInt(contentLengthMatch[1]);
+                                    const headerEndIndex =
+                                        headerEndMatch.index + headerEndMatch[0].length;
+
+                                    const totalNeeded = headerEndIndex + contentLength;
+                                    if (messageBuffer.length < totalNeeded) {
+                                        logger.debug('Waiting for more data', {
+                                            have: messageBuffer.length,
+                                            need: totalNeeded,
+                                        });
+                                        break;
+                                    }
+
+                                    const content = messageBuffer.slice(
+                                        headerEndIndex,
+                                        headerEndIndex + contentLength
+                                    );
+                                    messageBuffer = messageBuffer.slice(
+                                        headerEndIndex + contentLength
+                                    );
+                                    logger.debug('Processing complete LSP message', {
+                                        contentLength,
+                                        remainingBuffer: messageBuffer.length,
+                                    });
+
+                                    try {
+                                        const response = JSON.parse(content);
+
+                                        // Get the original request method and clean up
+                                        let originalMethod = null;
+                                        if (response.id) {
+                                            const reqData = pendingRequests.get(response.id);
+                                            originalMethod =
+                                                typeof reqData === 'object'
+                                                    ? reqData.method
+                                                    : reqData;
+                                            if (reqData) {
+                                                pendingRequests.delete(response.id);
+                                            }
+                                        }
+
+                                        logger.debug('Sending LSP response', {
+                                            id: response.id,
+                                            method: response.method,
+                                            originalMethod: originalMethod,
+                                            hasResult: !!response.result,
+                                            hasError: !!response.error,
+                                        });
+
+                                        ws.send(JSON.stringify(response));
+                                    } catch (parseError) {
+                                        logger.error('Failed to parse LSP response', {
+                                            error: parseError.message,
+                                        });
+                                    }
+                                }
+                            } catch (error) {
+                                logger.error('Error processing pylsp output', {
+                                    error: error.message,
+                                });
+                            }
+                        });
+
+                        pylsp.stderr.on('data', (data) => {
+                            const output = data.toString().trim();
+                            if (output) {
+                                // Parse common pylsp stderr messages
+                                if (output.includes('reformatted')) {
+                                    logger.debug(output, { source: 'pylsp.formatter' });
+                                } else if (output.includes('mypy')) {
+                                    logger.debug(output, { source: 'pylsp.mypy' });
+                                } else if (output.includes('ERROR') || output.includes('Error')) {
+                                    logger.error(output, { source: 'pylsp' });
+                                } else {
+                                    logger.debug(output, { source: 'pylsp' });
+                                }
+                            }
+                        });
+
+                        pylsp.on('exit', (code) => {
+                            logger.info('pylsp exited from pool', { userId, exitCode: code });
+                            // Remove from pool on exit
+                            lspPool.terminateProcess(userId);
+                        });
+
+                        // Send initialize request after pylsp is ready
+                        if (pylsp && pylsp.stdin.writable) {
+                            const content = JSON.stringify(data);
+                            const header = `Content-Length: ${Buffer.byteLength(content)}\r\n\r\n`;
+                            logger.debug('Sending initialize to pylsp', {
+                                method: data.method,
+                                id: data.id,
+                            });
+                            pylsp.stdin.write(header + content);
+                        } else {
+                            logger.error('pylsp stdin not writable after creation');
+                        }
+                    })
+                    .catch((error) => {
+                        logger.error('Failed to get pylsp from pool', {
+                            userId,
+                            error: error.message,
+                        });
                         ws.send(
                             JSON.stringify({
                                 jsonrpc: '2.0',
                                 id: data.id,
                                 error: {
                                     code: -32099,
-                                    message:
-                                        'Python Language Server not available. Install pylsp with: pip install python-lsp-server',
+                                    message: 'Python Language Server not available',
                                 },
                             })
                         );
+                        return;
                     });
-                } catch (error) {
-                    logger.error('Failed to spawn pylsp', { error: error.message });
-                    ws.send(
-                        JSON.stringify({
-                            jsonrpc: '2.0',
-                            id: data.id,
-                            error: {
-                                code: -32099,
-                                message: 'Python Language Server not available',
-                            },
-                        })
-                    );
-                    return;
-                }
-
-                pylsp.stdout.on('data', (chunk) => {
-                    try {
-                        messageBuffer += chunk.toString();
-
-                        // Memory optimization: limit buffer size to prevent memory bloat
-                        if (messageBuffer.length > MAX_BUFFER_SIZE) {
-                            logger.warn('Message buffer exceeded limit, clearing old data', {
-                                bufferLength: messageBuffer.length,
-                            });
-                            // Keep only the last 100KB to avoid losing incomplete messages
-                            messageBuffer = messageBuffer.slice(-100 * 1024);
-                        }
-
-                        logger.debug('Received chunk from pylsp', {
-                            bufferLength: messageBuffer.length,
-                        });
-
-                        // Process complete LSP messages
-                        // eslint-disable-next-line no-constant-condition
-                        while (true) {
-                            // Look for Content-Length header anywhere in the header section
-                            const contentLengthMatch =
-                                messageBuffer.match(/Content-Length:\s*(\d+)/);
-                            if (!contentLengthMatch) {
-                                logger.debug('No Content-Length header found yet');
-                                break;
-                            }
-
-                            // Find the end of all headers (double newline)
-                            const headerEndMatch = messageBuffer.match(/\r?\n\r?\n/);
-                            if (!headerEndMatch) {
-                                logger.debug('No complete header section found yet');
-                                break;
-                            }
-
-                            const contentLength = parseInt(contentLengthMatch[1]);
-                            const headerEndIndex = headerEndMatch.index + headerEndMatch[0].length;
-
-                            const totalNeeded = headerEndIndex + contentLength;
-                            if (messageBuffer.length < totalNeeded) {
-                                logger.debug('Waiting for more data', {
-                                    have: messageBuffer.length,
-                                    need: totalNeeded,
-                                });
-                                break;
-                            }
-
-                            const content = messageBuffer.slice(
-                                headerEndIndex,
-                                headerEndIndex + contentLength
-                            );
-                            messageBuffer = messageBuffer.slice(headerEndIndex + contentLength);
-                            logger.debug('Processing complete LSP message', {
-                                contentLength,
-                                remainingBuffer: messageBuffer.length,
-                            });
-
-                            try {
-                                const response = JSON.parse(content);
-
-                                // Get the original request method and clean up
-                                let originalMethod = null;
-                                if (response.id) {
-                                    const reqData = pendingRequests.get(response.id);
-                                    originalMethod =
-                                        typeof reqData === 'object' ? reqData.method : reqData;
-                                    if (reqData) {
-                                        pendingRequests.delete(response.id);
-                                    }
-                                }
-
-                                logger.debug('Sending LSP response', {
-                                    id: response.id,
-                                    method: response.method,
-                                    originalMethod: originalMethod,
-                                    hasResult: !!response.result,
-                                    hasError: !!response.error,
-                                });
-
-                                ws.send(JSON.stringify(response));
-                            } catch (parseError) {
-                                logger.error('Failed to parse LSP response', {
-                                    error: parseError.message,
-                                });
-                            }
-                        }
-                    } catch (error) {
-                        logger.error('Error processing pylsp output', { error: error.message });
-                    }
-                });
-
-                pylsp.stderr.on('data', (data) => {
-                    const output = data.toString().trim();
-                    if (output) {
-                        // Parse common pylsp stderr messages
-                        if (output.includes('reformatted')) {
-                            logger.debug(output, { source: 'pylsp.formatter' });
-                        } else if (output.includes('mypy')) {
-                            logger.debug(output, { source: 'pylsp.mypy' });
-                        } else if (output.includes('ERROR') || output.includes('Error')) {
-                            logger.error(output, { source: 'pylsp' });
-                        } else {
-                            logger.debug(output, { source: 'pylsp' });
-                        }
-                    }
-                });
-
-                pylsp.on('exit', (code) => {
-                    logger.info('pylsp exited', { exitCode: code });
-                });
-            }
-
-            if (pylsp && pylsp.stdin.writable) {
+            } else if (pylsp && pylsp.stdin.writable) {
+                // Send other requests (non-initialize) to already initialized pylsp
                 const content = JSON.stringify(data);
                 const header = `Content-Length: ${Buffer.byteLength(content)}\r\n\r\n`;
                 logger.debug('Sending to pylsp', { method: data.method, id: data.id });
                 pylsp.stdin.write(header + content);
-            } else {
-                logger.error('pylsp not ready or stdin not writable');
+            } else if (data.method !== 'initialize') {
+                logger.error('pylsp not ready or stdin not writable', { method: data.method });
             }
         } catch (error) {
             logger.error('WebSocket message error', { error: error.message });
@@ -237,13 +270,33 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        logger.info('Language server client disconnected');
+        logger.info('Language server client disconnected', { userId });
 
         // Cleanup interval to prevent memory leak
         clearInterval(cleanupInterval);
 
+        // Clear all pending requests to prevent memory leak
+        pendingRequests.clear();
+
+        // Clear message buffer to free memory
+        messageBuffer = '';
+
+        // Release process back to pool (don't kill it)
         if (pylsp) {
-            pylsp.kill();
+            lspPool.releaseProcess(userId);
+        }
+    });
+
+    ws.on('error', (error) => {
+        logger.error('WebSocket error', { userId, error: error.message });
+
+        // Cleanup on error
+        clearInterval(cleanupInterval);
+        pendingRequests.clear();
+        messageBuffer = '';
+
+        if (pylsp) {
+            lspPool.releaseProcess(userId);
         }
     });
 });

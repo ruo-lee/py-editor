@@ -11,7 +11,8 @@ const logger = require('../utils/logger');
  * Check Python syntax
  */
 async function checkSyntax(code, filename = 'syntax_check.py') {
-    const tempFile = path.join('/tmp', filename);
+    // Use /tmp for temp files to prevent workspace pollution
+    const tempFile = path.join('/tmp', `syntax_${Date.now()}_${filename}`);
     await fs.writeFile(tempFile, code);
 
     return new Promise((resolve) => {
@@ -103,7 +104,8 @@ async function executeCode(code, options = {}) {
         input = '',
     } = options;
 
-    const tempFile = path.join(basePath, filename);
+    // Use /tmp for execution temp files to prevent workspace pollution
+    const tempFile = path.join('/tmp', `exec_${Date.now()}_${filename}`);
     await fs.writeFile(tempFile, code);
 
     return new Promise((resolve) => {

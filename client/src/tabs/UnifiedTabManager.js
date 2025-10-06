@@ -1,3 +1,5 @@
+import { getModelRefCounter } from '../utils/modelRefCounter.js';
+
 /**
  * UnifiedTabManager - Unified tab management for all editors
  * Handles tab creation, switching, closing for left, right, or merged editor
@@ -9,6 +11,9 @@ export class UnifiedTabManager {
         this.editorId = editorId; // 'left' or 'right'
         this.tabBarId = editorId === 'left' ? 'tabBar' : 'tabBar2';
         this.filePathBarId = editorId === 'left' ? 'filePathBar' : 'filePathBar2';
+
+        // Get model reference counter
+        this.modelRefCounter = getModelRefCounter();
 
         // Note: Don't store editor/openTabs references - get them dynamically
         // because rightEditor may not be created yet when this is constructed
@@ -289,24 +294,36 @@ export class UnifiedTabManager {
         );
         if (!tab) return;
 
+        // Cleanup drag event listeners before removing from DOM
+        if (tab._dragHandlers) {
+            tab.removeEventListener('dragstart', tab._dragHandlers.dragstart);
+            tab.removeEventListener('dragend', tab._dragHandlers.dragend);
+            tab.removeEventListener('dragover', tab._dragHandlers.dragover);
+            delete tab._dragHandlers;
+            delete tab._dragHandlersAttached;
+        }
+
         // Remove from DOM
         tab.remove();
 
-        // Dispose model if requested and if it exists in this editor's openTabs
+        // Handle model disposal using reference counter
         const tabData = openTabs.get(filepath);
         if (disposeModel && tabData && tabData.model) {
-            // Check if this model is used in the other editor
-            const otherOpenTabs =
-                this.editorId === 'left' ? this.context.rightOpenTabs : this.context.openTabs;
-            const isUsedInOtherEditor = otherOpenTabs && otherOpenTabs.has(filepath);
+            const modelUri = tabData.model.uri.toString();
 
-            // Only dispose if not used in other editor
-            if (!isUsedInOtherEditor) {
-                // Cleanup model listener before disposing
-                if (this.context.fileLoader) {
-                    this.context.fileLoader.cleanupModelListener(tabData.model.uri.toString());
-                }
-                tabData.model.dispose();
+            // Cleanup model listener before removing reference
+            if (this.context.fileLoader) {
+                this.context.fileLoader.cleanupModelListener(modelUri);
+            }
+
+            // Remove reference - model will be disposed when refCount reaches 0
+            const wasDisposed = this.modelRefCounter.removeReference(modelUri);
+
+            if (wasDisposed) {
+                console.debug('Model disposed after last reference removed', {
+                    filepath,
+                    editorId: this.editorId,
+                });
             }
         }
 
@@ -457,21 +474,26 @@ export class UnifiedTabManager {
      * Setup drag handlers for a tab element
      */
     setupTabDragHandlers(tab, filepath) {
-        tab.addEventListener('dragstart', (e) => {
+        // Check if handlers already exist to prevent duplicates
+        if (tab._dragHandlersAttached) {
+            return;
+        }
+
+        const dragStartHandler = (e) => {
             e.dataTransfer.effectAllowed = 'move';
             // Read filepath from tab element to handle renamed files
             const currentFilepath = tab.dataset.filepath || tab.dataset.file || filepath;
             e.dataTransfer.setData('text/plain', currentFilepath);
             e.dataTransfer.setData('editor-group', this.editorId);
             tab.classList.add('dragging');
-        });
+        };
 
-        tab.addEventListener('dragend', (_e) => {
+        const dragEndHandler = (_e) => {
             tab.classList.remove('dragging');
             document.querySelectorAll('.tab').forEach((t) => t.classList.remove('drag-over'));
-        });
+        };
 
-        tab.addEventListener('dragover', (e) => {
+        const dragOverHandler = (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
 
@@ -488,7 +510,21 @@ export class UnifiedTabManager {
                     tab.parentNode.insertBefore(draggingTab, tab.nextSibling);
                 }
             }
-        });
+        };
+
+        tab.addEventListener('dragstart', dragStartHandler);
+        tab.addEventListener('dragend', dragEndHandler);
+        tab.addEventListener('dragover', dragOverHandler);
+
+        // Store handlers for cleanup
+        tab._dragHandlers = {
+            dragstart: dragStartHandler,
+            dragend: dragEndHandler,
+            dragover: dragOverHandler,
+        };
+
+        // Mark as attached
+        tab._dragHandlersAttached = true;
     }
 
     /**
