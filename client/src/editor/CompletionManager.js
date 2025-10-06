@@ -31,9 +31,9 @@ export class CompletionManager {
 
         // Add Python snippets
         monaco.languages.registerCompletionItemProvider('python', {
-            triggerCharacters: [' '],
-            provideCompletionItems: () => {
-                return { suggestions: this.getBasicCompletions() };
+            triggerCharacters: [' ', '/'],
+            provideCompletionItems: (model, position) => {
+                return { suggestions: this.getBasicCompletions(model, position) };
             },
         });
 
@@ -58,19 +58,47 @@ export class CompletionManager {
         });
     }
 
-    getBasicCompletions() {
+    getBasicCompletions(model, position) {
         const suggestions = [];
 
         // Add snippet suggestions
         if (this.context.snippets && typeof this.context.snippets === 'object') {
-            Object.entries(this.context.snippets).forEach(([_key, snippet]) => {
+            Object.entries(this.context.snippets).forEach(([key, snippet]) => {
+                // Calculate the range to replace (including '/' if present)
+                let range = undefined;
+
+                // Only calculate range if model and position are available
+                if (model && position) {
+                    try {
+                        const lineContent = model.getLineContent(position.lineNumber);
+                        const textBeforeCursor = lineContent.substring(0, position.column - 1);
+                        const match = textBeforeCursor.match(/\/(\w*)$/);
+
+                        if (match) {
+                            range = {
+                                startLineNumber: position.lineNumber,
+                                startColumn: position.column - match[0].length,
+                                endLineNumber: position.lineNumber,
+                                endColumn: position.column,
+                            };
+                        }
+                    } catch (e) {
+                        // If there's an error getting line content, just skip range calculation
+                        console.warn('Error calculating snippet range:', e);
+                    }
+                }
+
                 suggestions.push({
-                    label: snippet.prefix,
+                    label: {
+                        label: snippet.prefix, // Keep the '/' in the label to match VSCode behavior
+                        description: key, // Show snippet key as description (e.g., "에러 코드와 성공 코드 목록")
+                    },
                     kind: monaco.languages.CompletionItemKind.Snippet,
                     insertText: snippet.body.join('\n'),
                     insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                     documentation: snippet.description,
                     detail: 'Python Snippet',
+                    range: range, // Replace the entire matched text including '/'
                 });
             });
         }
