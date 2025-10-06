@@ -186,36 +186,9 @@ export class EditorInitializer {
     }
 
     setupContentChangeTracking() {
-        // Auto-save on change
-        this.context.editor.onDidChangeModelContent((_event) => {
-            // Get the model that changed
-            const model = this.context.editor.getModel();
-            if (!model) return;
-
-            // Get the file path from the model's URI
-            const uri = model.uri.toString();
-
-            // Skip stdlib files - they use stdlib:// URI scheme
-            if (uri.startsWith('stdlib://')) {
-                return;
-            }
-
-            let filePath = uri.replace('file://', '').replace('inmemory://', '');
-
-            // Use activeFile as fallback if we can't get path from model
-            if (!filePath && this.context.activeFile) {
-                filePath = this.context.activeFile;
-            }
-
-            if (filePath) {
-                this.context.saveFile(filePath);
-                // Notify language server of changes
-                const content = model.getValue();
-                this.context.notifyDocumentChanged(filePath, content);
-
-                // Real-time syntax checking (debounced)
-                this.context.debouncedSyntaxCheck();
-            }
-        });
+        // NOTE: Content change tracking is now handled at MODEL level (in FileLoader)
+        // to prevent duplicate notifications when the same model is used in split editors.
+        // Saved state updates are also handled at model level.
+        // No editor-level listeners needed here anymore
     }
 }

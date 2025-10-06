@@ -23,7 +23,6 @@ import { ImprovedLSPIntegration } from './src/lsp/ImprovedLSPIntegration.js';
 import { FileUploadManager } from './src/upload/FileUploadManager.js';
 import { TabContextMenuManager } from './src/tabs/TabContextMenuManager.js';
 import { TabDragDropManager } from './src/tabs/TabDragDropManager.js';
-import { ModelSyncManager } from './src/sync/ModelSyncManager.js';
 import { WorkspaceManager } from './src/ui/WorkspaceManager.js';
 import { TemplateSelector } from './src/ui/TemplateSelector.js';
 import { FormatManager } from './src/editor/FormatManager.js';
@@ -156,7 +155,6 @@ class PythonIDE {
         // rightTabManager will be initialized when split view is created
         this.rightTabManager = null;
         this.tabDragDropManager = new TabDragDropManager(this);
-        this.modelSyncManager = new ModelSyncManager(this);
         this.workspaceManager = new WorkspaceManager(this);
         this.completionManager = new CompletionManager(this);
         this.validationManager = new ValidationManager(this);
@@ -543,11 +541,12 @@ class PythonIDE {
     }
 
     handleTabClose(filepath) {
-        // Cleanup sync listener if exists
-        this.cleanupSyncListener(filepath);
-
         const tabData = this.openTabs.get(filepath);
         if (tabData) {
+            // Cleanup model listener before disposing
+            if (this.fileLoader) {
+                this.fileLoader.cleanupModelListener(tabData.model.uri.toString());
+            }
             tabData.model.dispose();
             this.openTabs.delete(filepath);
         }
@@ -603,11 +602,6 @@ class PythonIDE {
                     // Hide references panel when switching tabs (UX improvement)
                     if (this.referencesPanel) {
                         this.referencesPanel.hide('left');
-                    }
-
-                    // Setup sync if same file is open in both editors
-                    if (this.splitViewActive) {
-                        this.setupModelSync(filepath);
                     }
                 }
             } else {
@@ -803,11 +797,9 @@ class PythonIDE {
 
     switchToTabInSplit(filepath) {
         this.rightTabManager.switchToTabInSplit(filepath);
-        this.setupModelSync(filepath);
     }
 
     closeTabInSplit(filepath) {
-        this.cleanupSyncListener(filepath);
         this.rightTabManager.closeTabInSplit(filepath);
         if (this.rightOpenTabs.size === 0) {
             this.closeSplitView();
@@ -828,18 +820,6 @@ class PythonIDE {
 
     closeSplitView(mergeTabsToLeft = false) {
         this.splitViewManager.closeSplitView(mergeTabsToLeft);
-    }
-
-    setupModelSync(filepath) {
-        this.modelSyncManager.setupModelSync(filepath);
-    }
-
-    cleanupSyncListener(filepath) {
-        this.modelSyncManager.cleanupSyncListener(filepath);
-    }
-
-    cleanupAllSyncListeners() {
-        this.modelSyncManager.cleanupAllSyncListeners();
     }
 
     toggleSplit() {

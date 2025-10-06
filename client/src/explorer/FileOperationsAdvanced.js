@@ -161,24 +161,27 @@ export class FileOperationsAdvanced {
         const isOpenInLeft = this.context.openTabs.has(oldPath);
         const isOpenInRight = this.context.rightOpenTabs && this.context.rightOpenTabs.has(oldPath);
 
-        // Get model and content before any disposal
-        let leftOldModel = null;
-        let rightOldModel = null;
+        // Get old model and check if it's shared
+        let oldModel = null;
         let content = null;
         let language = null;
+        let isSharedModel = false;
 
-        if (isOpenInLeft) {
-            leftOldModel = this.context.openTabs.get(oldPath).model;
-            content = leftOldModel.getValue();
-            language = leftOldModel.getLanguageId();
-        }
-
-        if (isOpenInRight) {
-            rightOldModel = this.context.rightOpenTabs.get(oldPath).model;
-            if (!content) {
-                content = rightOldModel.getValue();
-                language = rightOldModel.getLanguageId();
-            }
+        if (isOpenInLeft && isOpenInRight) {
+            const leftModel = this.context.openTabs.get(oldPath).model;
+            const rightModel = this.context.rightOpenTabs.get(oldPath).model;
+            isSharedModel = leftModel === rightModel;
+            oldModel = leftModel;
+            content = oldModel.getValue();
+            language = oldModel.getLanguageId();
+        } else if (isOpenInLeft) {
+            oldModel = this.context.openTabs.get(oldPath).model;
+            content = oldModel.getValue();
+            language = oldModel.getLanguageId();
+        } else if (isOpenInRight) {
+            oldModel = this.context.rightOpenTabs.get(oldPath).model;
+            content = oldModel.getValue();
+            language = oldModel.getLanguageId();
         }
 
         // Notify LSP: close old file, open new file (only once)
@@ -187,16 +190,25 @@ export class FileOperationsAdvanced {
             this.context.notifyDocumentOpened(newPath, content);
         }
 
+        // Create ONE new model (shared if file is open in both editors)
+        let newModel = null;
+        if (oldModel) {
+            // First, cleanup the old model's listener
+            if (this.context.fileLoader) {
+                this.context.fileLoader.cleanupModelListener(oldModel.uri.toString());
+            }
+
+            newModel = monaco.editor.createModel(content, language, monaco.Uri.file(newPath));
+
+            // Setup model-level change tracking for the new model
+            if (this.context.fileLoader && !newPath.startsWith('/usr/local/lib/python3.11/')) {
+                this.context.fileLoader.setupModelChangeTracking(newModel, newPath);
+            }
+        }
+
         // Update left editor if file is open
         if (isOpenInLeft) {
             const tabData = this.context.openTabs.get(oldPath);
-
-            // Create new model for left editor
-            const newLeftModel = monaco.editor.createModel(
-                content,
-                language,
-                monaco.Uri.file(newPath)
-            );
 
             // Remove old tab from DOM
             const oldTab = document.querySelector(
@@ -206,11 +218,11 @@ export class FileOperationsAdvanced {
                 oldTab.remove();
             }
 
-            // Update tab data map
+            // Update tab data map with shared model
             this.context.openTabs.delete(oldPath);
             this.context.openTabs.set(newPath, {
                 ...tabData,
-                model: newLeftModel,
+                model: newModel,
             });
 
             // Update active file reference
@@ -225,25 +237,13 @@ export class FileOperationsAdvanced {
 
             // Update editor model
             if (this.context.editor) {
-                this.context.editor.setModel(newLeftModel);
-            }
-
-            // Dispose old left model
-            if (leftOldModel) {
-                leftOldModel.dispose();
+                this.context.editor.setModel(newModel);
             }
         }
 
         // Update right editor if file is open
         if (isOpenInRight) {
             const tabData = this.context.rightOpenTabs.get(oldPath);
-
-            // Create new model for right editor
-            const newRightModel = monaco.editor.createModel(
-                content,
-                language,
-                monaco.Uri.file(newPath)
-            );
 
             // Remove old tab from DOM
             const oldTab = document.querySelector(
@@ -253,11 +253,11 @@ export class FileOperationsAdvanced {
                 oldTab.remove();
             }
 
-            // Update tab data map
+            // Update tab data map with SAME shared model
             this.context.rightOpenTabs.delete(oldPath);
             this.context.rightOpenTabs.set(newPath, {
                 ...tabData,
-                model: newRightModel,
+                model: newModel, // Use the same model as left
             });
 
             // Update active file reference
@@ -272,13 +272,13 @@ export class FileOperationsAdvanced {
 
             // Update right editor model if this file is currently active
             if (this.context.rightEditor && this.context.rightActiveFile === newPath) {
-                this.context.rightEditor.setModel(newRightModel);
+                this.context.rightEditor.setModel(newModel);
             }
+        }
 
-            // Dispose old right model
-            if (rightOldModel) {
-                rightOldModel.dispose();
-            }
+        // Dispose old model only once (after both editors are updated)
+        if (oldModel) {
+            oldModel.dispose();
         }
 
         // Update file path display bars for both editors (always update if file is active)

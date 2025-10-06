@@ -302,6 +302,10 @@ export class UnifiedTabManager {
 
             // Only dispose if not used in other editor
             if (!isUsedInOtherEditor) {
+                // Cleanup model listener before disposing
+                if (this.context.fileLoader) {
+                    this.context.fileLoader.cleanupModelListener(tabData.model.uri.toString());
+                }
                 tabData.model.dispose();
             }
         }

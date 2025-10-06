@@ -7,6 +7,69 @@ import { getLanguageFromFile } from '../utils/fileIcons.js';
 export class FileLoader {
     constructor(context) {
         this.context = context;
+        // Track model-level change listeners to prevent duplicates
+        this.modelChangeListeners = new Map();
+        // Track debounce timers for LSP notifications
+        this.lspNotifyTimers = new Map();
+    }
+
+    /**
+     * Setup model-level change tracking
+     * This ensures LSP is notified exactly once per change,
+     * regardless of which editor(s) display the model
+     */
+    setupModelChangeTracking(model, filepath) {
+        const uri = model.uri.toString();
+
+        // Skip if already tracking this model
+        if (this.modelChangeListeners.has(uri)) {
+            return;
+        }
+
+        // Skip stdlib files - they are read-only
+        if (uri.startsWith('stdlib://')) {
+            return;
+        }
+
+        const listener = model.onDidChangeContent((event) => {
+            // Update saved state in both tabs if open (immediate)
+            if (this.context.openTabs.has(filepath)) {
+                this.context.openTabs.get(filepath).saved = false;
+            }
+            if (this.context.rightOpenTabs && this.context.rightOpenTabs.has(filepath)) {
+                this.context.rightOpenTabs.get(filepath).saved = false;
+            }
+
+            // Debounce LSP notifications to prevent duplicates from rapid events
+            // Clear existing timer
+            if (this.lspNotifyTimers.has(filepath)) {
+                clearTimeout(this.lspNotifyTimers.get(filepath));
+            }
+
+            // Set new timer - only notify after 50ms of no changes
+            const timer = setTimeout(() => {
+                const content = model.getValue();
+                this.context.notifyDocumentChanged(filepath, content);
+                this.context.debouncedSyntaxCheck();
+                this.lspNotifyTimers.delete(filepath);
+            }, 50);
+
+            this.lspNotifyTimers.set(filepath, timer);
+        });
+
+        // Store listener for cleanup
+        this.modelChangeListeners.set(model.uri.toString(), listener);
+    }
+
+    /**
+     * Cleanup model change listener
+     */
+    cleanupModelListener(modelUri) {
+        const listener = this.modelChangeListeners.get(modelUri);
+        if (listener) {
+            listener.dispose();
+            this.modelChangeListeners.delete(modelUri);
+        }
     }
 
     async openFile(filepath, targetEditor = 'left') {
@@ -37,13 +100,8 @@ export class FileLoader {
                 // If exists in left only, share the model to right
                 if (existingInLeft) {
                     const tabData = this.context.openTabs.get(filepath);
-                    this.context.rightOpenTabs.set(filepath, tabData); // Share the same model
+                    this.context.rightOpenTabs.set(filepath, tabData);
                     this.context.rightTabManager.openTab(filepath, tabData.isStdlib);
-
-                    // Set model on right editor
-                    if (this.context.rightEditor && tabData.model) {
-                        this.context.rightEditor.setModel(tabData.model);
-                    }
 
                     // Update placeholder visibility
                     if (
@@ -74,8 +132,9 @@ export class FileLoader {
                 // If exists in right only, share the model to left
                 if (existingInRight) {
                     const tabData = this.context.rightOpenTabs.get(filepath);
-                    this.context.openTabs.set(filepath, tabData); // Share the same model
+                    this.context.openTabs.set(filepath, tabData);
                     this.context.tabManager.openTab(filepath, tabData.isStdlib);
+
                     this.context.focusedEditor = 'left';
                     if (this.context.updateEditorFocusVisual) {
                         this.context.updateEditorFocusVisual();
@@ -128,6 +187,11 @@ export class FileLoader {
                     getLanguageFromFile(filepath),
                     modelUri
                 );
+
+                // Setup model-level change tracking for non-stdlib files
+                if (!isStdlib) {
+                    this.setupModelChangeTracking(model, filepath);
+                }
             }
 
             this.context.openTabs.set(filepath, {
