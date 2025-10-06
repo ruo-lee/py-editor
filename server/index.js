@@ -29,6 +29,23 @@ app.use('/api/files', filesRouter);
 app.use('/api', workspaceRouter);
 app.use('/api', executionRouter);
 
+// Version endpoint
+app.get('/api/version', (req, res) => {
+    res.json({ version: process.env.APP_VERSION || 'dev' });
+});
+
+// Python version endpoint
+app.get('/api/python-version', (req, res) => {
+    const { exec } = require('child_process');
+    exec('python3 --version', (error, stdout, stderr) => {
+        if (error) {
+            return res.json({ version: 'Python 3.11' });
+        }
+        const version = stdout.trim() || stderr.trim() || 'Python 3.11';
+        res.json({ version });
+    });
+});
+
 // WebSocket server for language server
 const server = require('http').createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -44,6 +61,9 @@ wss.on('connection', (ws) => {
 
     // Generate unique user ID for this connection
     const userId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Send userId to client
+    ws.send(JSON.stringify({ type: 'userId', userId }));
 
     let pylsp = null;
     let messageBuffer = '';

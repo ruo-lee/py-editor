@@ -28,6 +28,7 @@ import { TemplateSelector } from './src/ui/TemplateSelector.js';
 import { FormatManager } from './src/editor/FormatManager.js';
 import { TypeCheckManager } from './src/editor/TypeCheckManager.js';
 import { ProblemsManager } from './src/ui/ProblemsManager.js';
+import { StatusBarManager } from './src/ui/StatusBarManager.js';
 import { getFileIcon } from './src/utils/fileIcons.js';
 import {
     closeAllDialogs,
@@ -99,6 +100,7 @@ class PythonIDE {
         this.formatManager = new FormatManager(this);
         this.typeCheckManager = new TypeCheckManager(this);
         this.problemsManager = new ProblemsManager(this);
+        this.statusBarManager = new StatusBarManager(this);
 
         // Apply theme after ThemeManager is initialized
         this.applyTheme(this.currentTheme);
@@ -231,6 +233,9 @@ class PythonIDE {
             // Initialize format and type check managers after LSP is connected
             this.formatManager.initialize();
             this.typeCheckManager.initialize();
+
+            // Notify status bar of LSP connection
+            window.dispatchEvent(new CustomEvent('lsp-connected'));
         };
 
         // Keep reference to languageClient for backward compatibility
@@ -238,6 +243,13 @@ class PythonIDE {
         this.languageClient = this.lspClientInstance.languageClient;
         this.messageId = this.lspClientInstance.messageId;
         this.pendingRequests = this.lspClientInstance.pendingRequests;
+
+        // Listen for LSP disconnection
+        if (this.languageClient) {
+            this.languageClient.addEventListener('close', () => {
+                window.dispatchEvent(new CustomEvent('lsp-disconnected'));
+            });
+        }
     }
 
     // Note: initializeLSP, sendLSPRequest, and handleLSPResponse are now handled by LSPClient class
@@ -1031,6 +1043,33 @@ class PythonIDE {
 }
 
 // Initialize the IDE when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     new PythonIDE();
+
+    // Fetch and display app version
+    try {
+        const response = await fetch('/api/version');
+        const data = await response.json();
+        const versionBadge = document.getElementById('versionBadge');
+        if (versionBadge) {
+            versionBadge.textContent = data.version;
+        }
+    } catch (error) {
+        console.error('Failed to fetch version:', error);
+    }
+
+    // Fetch and display Python version
+    try {
+        const response = await fetch('/api/python-version');
+        const data = await response.json();
+        const pythonVersion = document.getElementById('pythonVersion');
+        if (pythonVersion) {
+            const versionSpan = pythonVersion.querySelector('span');
+            if (versionSpan) {
+                versionSpan.textContent = data.version;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to fetch Python version:', error);
+    }
 });

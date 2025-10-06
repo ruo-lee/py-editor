@@ -61,6 +61,72 @@ body {
     overflow: hidden;
 }
 
+/* Status bar at the bottom */
+.status-bar {
+    height: 22px;
+    background: #1e1e1e;
+    color: #cccccc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 12px;
+    border-top: 1px solid #2d2d2d;
+}
+
+.status-bar-left,
+.status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    cursor: default;
+    transition: background 0.1s;
+}
+
+.status-item i {
+    font-size: 14px;
+}
+
+.status-item.separator {
+    color: #606060;
+    padding: 0 2px;
+}
+
+.status-item.user-id,
+.status-item.lsp-status {
+    cursor: pointer;
+}
+
+.status-item.user-id:hover,
+.status-item.lsp-status:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.version-badge {
+    font-weight: 500;
+    color: #cccccc;
+}
+
+/* LSP Status colors */
+.lsp-status.connected {
+    color: #4ec9b0;
+}
+
+.lsp-status.disconnected {
+    color: #f48771;
+}
+
+.lsp-status.connecting {
+    color: #dcdcaa;
+}
+
 /* Common utilities */
 .loading {
     display: flex;

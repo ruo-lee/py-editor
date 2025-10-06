@@ -363,3 +363,31 @@ body.light-theme .api-domain-add input {
     color: #333333;
     border: 1px solid #e5e5e5;
 }
+
+/* Status bar */
+body.light-theme .status-bar {
+    background: #f3f3f3;
+    color: #333333;
+    border-top: 1px solid #e5e5e5;
+}
+
+body.light-theme .version-badge {
+    color: #333333;
+}
+
+body.light-theme .status-item.user-id:hover,
+body.light-theme .status-item.lsp-status:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .lsp-status.connected {
+    color: #0e8a16;
+}
+
+body.light-theme .lsp-status.disconnected {
+    color: #cb2431;
+}
+
+body.light-theme .lsp-status.connecting {
+    color: #b08800;
+}

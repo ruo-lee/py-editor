@@ -100,6 +100,39 @@
                 </div>
             </div>
         </div>
+        <div class="status-bar">
+            <div class="status-bar-left">
+                <span class="status-item version-badge" id="versionBadge">dev</span>
+                <span class="status-item user-id" id="userIdBadge" title="Click to copy">
+                    <i class="codicon codicon-account"></i>
+                    <span id="userIdText">-</span>
+                </span>
+                <span class="status-item python-version" id="pythonVersion">
+                    <i class="codicon codicon-symbol-namespace"></i>
+                    <span>Python 3.11</span>
+                </span>
+            </div>
+            <div class="status-bar-right">
+                <span class="status-item lsp-status" id="lspStatus" title="Language Server Protocol">
+                    <i class="codicon codicon-pulse" id="lspIcon"></i>
+                    <span id="lspText">Disconnected</span>
+                </span>
+                <span class="status-item file-info" id="fileInfo">
+                    <span>UTF-8</span>
+                    <span class="separator">|</span>
+                    <span>LF</span>
+                    <span class="separator">|</span>
+                    <span>Python</span>
+                </span>
+                <span class="status-item cursor-position" id="cursorPosition">
+                    <span>Ln 1, Col 1</span>
+                </span>
+                <span class="status-item current-time" id="currentTime">
+                    <i class="codicon codicon-watch"></i>
+                    <span id="timeText">--:--</span>
+                </span>
+            </div>
+        </div>
     </div>
     <script type="module" src="/main.js"></script>
 </body>

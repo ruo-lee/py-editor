@@ -46,6 +46,13 @@ export class LSPClient {
             this.languageClient.onmessage = (event) => {
                 try {
                     const response = JSON.parse(event.data);
+
+                    // Handle userId message from server
+                    if (response.type === 'userId') {
+                        this.handleUserIdMessage(response.userId);
+                        return;
+                    }
+
                     this.handleResponse(response);
                 } catch (error) {
                     console.error('Failed to parse LSP response:', error);
@@ -133,6 +140,11 @@ export class LSPClient {
     /**
      * Handle LSP server responses
      */
+    handleUserIdMessage(userId) {
+        // Dispatch custom event for status bar
+        window.dispatchEvent(new CustomEvent('lsp-userId', { detail: userId }));
+    }
+
     handleResponse(response) {
         // Handle notifications (no id)
         if (!response.id && response.method) {

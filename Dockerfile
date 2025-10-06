@@ -34,6 +34,9 @@ RUN mkdir -p /app/snippets
 # Default Python snippets
 COPY snippets/python.json /app/snippets/
 
+# Set environment variable for version
+ENV APP_VERSION=dev
+
 # Expose port
 EXPOSE 8080
 

@@ -40,6 +40,9 @@ export class EditorInitializer {
 
         // Initialize syntax checking debounce
         this.context.syntaxCheckTimeout = null;
+
+        // Setup cursor position tracking for status bar
+        this.setupCursorPositionTracking();
     }
 
     showWelcomePage() {
@@ -190,5 +193,20 @@ export class EditorInitializer {
         // to prevent duplicate notifications when the same model is used in split editors.
         // Saved state updates are also handled at model level.
         // No editor-level listeners needed here anymore
+    }
+
+    setupCursorPositionTracking() {
+        // Track cursor position changes for status bar
+        this.context.editor.onDidChangeCursorPosition((e) => {
+            const position = e.position;
+            window.dispatchEvent(
+                new CustomEvent('editor-cursor-change', {
+                    detail: {
+                        line: position.lineNumber,
+                        column: position.column,
+                    },
+                })
+            );
+        });
     }
 }
