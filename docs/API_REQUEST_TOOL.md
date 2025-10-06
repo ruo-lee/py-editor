@@ -1,144 +1,72 @@
-# API Request Tool Development Guide
+# API 요청 도구
 
-## Overview
+## 개요
 
-PyEditor includes a built-in HTTP client similar to Postman, allowing developers to test APIs directly within the IDE without switching applications.
+PyEditor에 내장된 HTTP 클라이언트로 Postman과 유사한 기능을 제공합니다.
 
-## Architecture
+## 주요 기능
 
-### Component Structure
+- **HTTP 메소드**: GET, POST, PUT, PATCH, DELETE
+- **요청 설정**: Query Parameters, Headers, Request Body
+- **응답 처리**: JSON, SSE(Server-Sent Events) 스트리밍
+- **도메인 관리**: 여러 API 서버 저장 및 전환
+- **테마 지원**: 라이트/다크 테마 자동 적용
+- **패널 리사이즈**: 450px ~ 1000px 크기 조절
+
+## 사용 방법
+
+### 1. 패널 열기
+
+우상단 지구본 아이콘 클릭
+
+### 2. 도메인 설정
+
+1. 톱니바퀴 아이콘 클릭
+2. "Add Domain" 버튼으로 도메인 추가
+3. 드롭다운에서 사용할 도메인 선택
+
+### 3. 요청 보내기
+
+1. HTTP 메소드 선택 (GET, POST 등)
+2. URL 경로 입력 (예: `/api/users`)
+3. 필요시 추가 옵션 설정:
+    - **Params**: Query Parameters
+    - **Headers**: HTTP 헤더
+    - **Body**: Request Body (JSON)
+4. "Send" 버튼 클릭
+
+## 기술 구조
+
+### 아키텍처
+
+```
+클라이언트 입력 → API 패널 → 서버 프록시 → 외부 API
+                    ↓
+              localStorage (도메인 저장)
+                    ↓
+              응답 표시
+```
+
+### 파일 구조
 
 ```
 client/
-├── api-panel.js       # Main API panel component
-├── main.js            # Integration point
-└── index.html         # Styles and layout
+├── api-panel.js       # API 패널 컴포넌트
+├── main.js            # 통합 지점
+└── index.html         # 스타일
 
 server/
-├── index.js           # API proxy endpoint
-└── api-proxy.js       # HTTP request handler
+├── index.js           # 프록시 엔드포인트
+└── api-proxy.js       # HTTP 요청 핸들러
 ```
 
-### Data Flow
+## 서버 프록시
 
-```
-User Input → ApiPanel → Server Proxy → External API
-                ↓
-         localStorage (domains)
-                ↓
-         Response Display
-```
+### 엔드포인트
 
-## Client-Side Implementation
+`POST /api/proxy-request`
 
-### ApiPanel Class (`client/api-panel.js`)
-
-**Core Responsibilities:**
-
-- HTTP request configuration (method, URL, params, headers, body)
-- Domain management with localStorage persistence
-- Request execution and response handling
-- SSE (Server-Sent Events) streaming support
-- Panel visibility and resize control
-
-**Key Methods:**
-
-```javascript
-// Show/hide panel
-show() { document.getElementById('apiPanel').classList.add('show'); }
-hide() { document.getElementById('apiPanel').classList.remove('show'); }
-
-// Send HTTP request
-async sendRequest() {
-    const response = await fetch('/api/proxy-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method, url, params, headers, body })
-    });
-}
-
-// Domain management
-saveDomains() { localStorage.setItem('api-domains', JSON.stringify(this.domains)); }
-loadDomains() { return JSON.parse(localStorage.getItem('api-domains') || '[]'); }
-```
-
-**JSON Body Parsing:**
-
-Request body from textarea is automatically parsed:
-
-```javascript
-let parsedBody = null;
-if (body.trim()) {
-    try {
-        parsedBody = JSON.parse(body);
-    } catch (e) {
-        parsedBody = body; // Send as string if not valid JSON
-    }
-}
-```
-
-### Panel Resize Implementation
-
-Mouse-based drag resizing with constraints:
-
-```javascript
-setupResizer() {
-    const resizer = document.getElementById('apiPanelResizer');
-    const panel = document.getElementById('apiPanel');
-
-    resizer.addEventListener('mousedown', (e) => {
-        isResizing = true;
-        startX = e.clientX;
-        startWidth = panel.offsetWidth;
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isResizing) return;
-        const diff = startX - e.clientX;
-        const newWidth = Math.max(450, Math.min(1000, startWidth + diff));
-        panel.style.width = `${newWidth}px`;
-    });
-}
-```
-
-**Constraints:**
-
-- Minimum: 450px (prevents content clipping)
-- Maximum: 1000px (prevents excessive width)
-
-### Response Handling
-
-**Regular Responses:**
-
-```javascript
-const result = await response.json();
-viewer.textContent = JSON.stringify(result.body, null, 2);
-metaBadge.className = 'api-response-meta success';
-metaBadge.textContent = `Response ${result.status} - ${duration}ms`;
-```
-
-**SSE Streaming:**
-
-```javascript
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-
-while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    viewer.textContent += chunk;
-}
-```
-
-## Server-Side Implementation
-
-### Proxy Endpoint (`server/index.js`)
-
-**Endpoint:** `POST /api/proxy-request`
-
-**Request Body:**
+### 요청 형식
 
 ```json
 {
@@ -146,71 +74,21 @@ while (true) {
     "url": "https://api.example.com/endpoint",
     "params": [{ "key": "param1", "value": "value1" }],
     "headers": [{ "key": "Authorization", "value": "Bearer token" }],
-    "body": { "key": "value" } // or string
+    "body": { "key": "value" }
 }
 ```
 
-**Implementation:**
+### CORS 우회
 
-```javascript
-app.post('/api/proxy-request', async (req, res) => {
-    const { method, url, params, headers, body } = req.body;
+브라우저의 CORS 제한을 서버 측 프록시로 우회하여 외부 API 호출을 가능하게 합니다.
 
-    const result = await proxyRequest({ method, url, params, headers, body });
+## 도메인 관리
 
-    if (result.isSSE) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        result.stream.pipe(res);
-    } else {
-        res.json(result);
-    }
-});
-```
+### 저장 위치
 
-### HTTP Request Handler (`server/api-proxy.js`)
+브라우저 localStorage (클라이언트 전용)
 
-**Core Logic:**
-
-```javascript
-async function proxyRequest(options) {
-    const { method, url, headers, params, body } = options;
-
-    // Build URL with query parameters
-    const targetUrl = new URL(url);
-    params.forEach(({ key, value }) => {
-        if (key) targetUrl.searchParams.append(key, value);
-    });
-
-    // Execute request
-    const protocol = targetUrl.protocol === 'https:' ? https : http;
-    const req = protocol.request(reqOptions, (res) => {
-        // Handle SSE
-        if (res.headers['content-type']?.includes('text/event-stream')) {
-            return { isSSE: true, stream: res, status, headers };
-        }
-
-        // Handle regular response
-        return { isSSE: false, body: parsedBody, status, headers };
-    });
-}
-```
-
-**SSE Detection:**
-
-Responses with `Content-Type: text/event-stream` are detected and piped directly to client without JSON serialization to avoid circular reference errors.
-
-## Domain Management
-
-### Storage Location
-
-Domains are stored in browser localStorage (client-side only):
-
-**Keys:**
-
-- `api-domains`: Array of domain objects
-- `api-selected-domain`: Currently selected domain name
-
-**Format:**
+### 저장 형식
 
 ```javascript
 // api-domains
@@ -223,195 +101,21 @@ Domains are stored in browser localStorage (client-side only):
 ('Local');
 ```
 
-### Domain Dialog
+## 응답 처리
 
-**HTML Structure:**
+### 일반 응답
 
-```html
-<div class="api-domain-dialog">
-    <div class="api-domain-dialog-content">
-        <div class="api-domain-dialog-header">
-            <h3>Manage Domains</h3>
-            <button class="close-btn">×</button>
-        </div>
-        <div class="api-domain-dialog-body">
-            <div class="api-domain-list">
-                <!-- Domain items -->
-            </div>
-        </div>
-    </div>
-</div>
-```
+JSON 형식으로 파싱하여 표시
 
-**Operations:**
+### SSE 스트리밍
 
-- Add: `addDomain()` - Creates new domain entry
-- Delete: `deleteDomain(name)` - Removes domain from array
-- Select: `selectDomain(name)` - Sets active domain
+`Content-Type: text/event-stream` 응답은 실시간 스트리밍으로 처리
 
-## Styling System
+## 보안
 
-### Theme Support
+### 입력 검증
 
-Both light and dark themes are supported through CSS class targeting:
-
-**Dark Theme (default):**
-
-```css
-.api-panel {
-    background: #1e1e1e;
-    color: #d4d4d4;
-}
-```
-
-**Light Theme:**
-
-```css
-body.light-theme .api-panel {
-    background: #ffffff;
-    color: #1f1f1f;
-}
-```
-
-### Response Badge States
-
-Color-coded status indicators with fixed dimensions:
-
-```css
-.api-response-meta {
-    height: 24px;
-    line-height: 16px;
-    white-space: nowrap;
-}
-
-.api-response-meta.loading {
-    background: #264f78;
-    color: #4fc3f7;
-}
-.api-response-meta.success {
-    background: #1a472a;
-    color: #4ec9b0;
-}
-.api-response-meta.error {
-    background: #5a1d1d;
-    color: #f48771;
-}
-.api-response-meta.streaming {
-    background: #3b3a30;
-    color: #dcdcaa;
-}
-```
-
-### Independent Scrolling
-
-Response viewer has fixed height with overflow:
-
-```css
-.api-simple-viewer {
-    height: 300px;
-    max-height: 500px;
-    overflow-y: auto;
-    overflow-x: auto;
-    white-space: pre-wrap;
-}
-```
-
-### Panel Resizer
-
-Visual indicator for resize capability:
-
-```css
-.api-panel-resizer {
-    position: absolute;
-    left: 0;
-    width: 4px;
-    cursor: col-resize;
-}
-
-.api-panel-resizer:hover {
-    background: #007acc;
-}
-.api-panel-resizer:active {
-    background: #1e90ff;
-}
-```
-
-## Integration Points
-
-### Main Application (`client/main.js`)
-
-**Initialization:**
-
-```javascript
-const apiPanel = new ApiPanel();
-
-// Toggle button
-const apiToggle = document.getElementById('apiToggle');
-apiToggle.addEventListener('click', () => {
-    const panel = document.getElementById('apiPanel');
-    if (panel.classList.contains('show')) {
-        apiPanel.hide();
-    } else {
-        apiPanel.show();
-    }
-});
-```
-
-**HTML Button:**
-
-```html
-<button id="apiToggle" title="API Request Tool">
-    <i class="codicon codicon-globe"></i>
-</button>
-```
-
-## Technical Decisions
-
-### Why Textarea Instead of Monaco?
-
-Monaco Editor requires web worker initialization which causes conflicts when multiple instances are created. Using simple textarea/pre elements avoids worker management complexity.
-
-### Why Browser localStorage?
-
-Domain configurations are user-specific and environment-dependent. Storing in localStorage keeps them client-side and prevents accidental commits to version control.
-
-### Why Server Proxy?
-
-Direct browser requests to external APIs are blocked by CORS policies. Server-side proxy bypasses CORS restrictions while maintaining security through server validation.
-
-### Why Stream Piping for SSE?
-
-Stream objects contain circular references that cannot be JSON serialized. Direct piping to response preserves stream integrity without serialization attempts.
-
-## Error Handling
-
-### Common Issues
-
-**1. Panel Not Opening**
-
-- Verify CSS class matches: `panel.classList.add('show')`
-- Check CSS definition: `.api-panel.show { display: flex; }`
-
-**2. JSON Body Errors**
-
-- Ensure body is parsed: `JSON.parse(body)`
-- Fallback to string for invalid JSON
-
-**3. SSE Circular Reference**
-
-- Never serialize stream objects
-- Use direct piping: `stream.pipe(response)`
-
-**4. Content Clipping on Resize**
-
-- Set appropriate minimum width (450px)
-- Test all content fits within constraints
-
-## Security Considerations
-
-### Input Validation
-
-Server validates all proxy requests:
+서버에서 모든 프록시 요청 검증:
 
 ```javascript
 if (!method || !url) {
@@ -419,90 +123,36 @@ if (!method || !url) {
 }
 ```
 
-### Request Timeout
+### 타임아웃
 
-Prevents hanging connections:
+30초 요청 타임아웃으로 hanging 연결 방지
 
-```javascript
-const reqOptions = {
-    timeout: 30000, // 30 seconds
-};
+## 테스트
 
-req.on('timeout', () => {
-    req.destroy();
-    reject(new Error('Request timeout'));
-});
-```
-
-### Error Exposure
-
-Errors are logged server-side but generic messages sent to client:
-
-```javascript
-catch (error) {
-    logger.error('API proxy error', { error: error.message });
-    res.status(500).json({ error: error.message });
-}
-```
-
-## Testing
-
-### Manual Testing Checklist
-
-- [ ] GET request to public API
-- [ ] POST request with JSON body
-- [ ] Request with query parameters
-- [ ] Request with custom headers
-- [ ] SSE streaming response
-- [ ] Domain add/delete/select
-- [ ] Panel show/hide
-- [ ] Panel resize (min/max bounds)
-- [ ] Light/dark theme switching
-- [ ] Response scrolling independence
-- [ ] Badge state transitions
-- [ ] Error handling display
-
-### Test Endpoints
-
-**Public APIs for testing:**
+### 테스트용 Public API
 
 - GET: `https://jsonplaceholder.typicode.com/posts/1`
 - POST: `https://jsonplaceholder.typicode.com/posts`
-- SSE: Custom server with `text/event-stream` response
 
-## Future Enhancements
+### 체크리스트
 
-**Potential improvements:**
+- [ ] GET 요청
+- [ ] POST 요청 (JSON body)
+- [ ] Query Parameters
+- [ ] Custom Headers
+- [ ] SSE 스트리밍
+- [ ] 도메인 추가/삭제/선택
+- [ ] 패널 표시/숨김
+- [ ] 패널 크기 조절
+- [ ] 테마 전환
+- [ ] 에러 처리
 
-- Request history/favorites
-- Environment variables
-- Request collections
-- Code generation (curl, fetch, axios)
-- Response formatting (JSON, XML, HTML)
-- Authentication presets (Bearer, Basic, OAuth)
-- Request/response size limits
-- Export/import domain configurations
-- WebSocket support
-- GraphQL query builder
+## 향후 개선 사항
 
-## File Structure Reference
-
-```
-/home/ruo/my_project/py-editor/
-├── client/
-│   ├── api-panel.js          # Lines 1-530 (main component)
-│   ├── main.js               # ApiPanel integration
-│   └── index.html            # Lines 891-1526 (CSS)
-├── server/
-│   ├── index.js              # Lines 705-740 (proxy endpoint)
-│   └── api-proxy.js          # Lines 1-126 (HTTP handler)
-└── docs/
-    └── API_REQUEST_TOOL.md   # This file
-```
-
-## References
-
-- HTTP Methods: RFC 7231
-- Server-Sent Events: WHATWG HTML Spec
-- localStorage: Web Storage API
-- Stream API: Node.js Stream Documentation
+- 요청 히스토리/즐겨찾기
+- 환경 변수 지원
+- 요청 컬렉션
+- 코드 생성 (curl, fetch, axios)
+- 인증 프리셋 (Bearer, Basic, OAuth)
+- WebSocket 지원
+- GraphQL 쿼리 빌더
