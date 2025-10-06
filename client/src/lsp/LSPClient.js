@@ -884,7 +884,7 @@ export class LSPClient {
                     : monaco.Uri.file(filePath)
             );
 
-            if (model) {
+            if (model && lineNumber > 0 && lineNumber <= model.getLineCount()) {
                 const lineContent = model.getLineContent(lineNumber);
 
                 // For unused code warnings
@@ -1012,6 +1012,11 @@ export class LSPClient {
 
         // Create decorations for unused code - apply opacity to specific word only
         const decorations = unusedMarkers.map((marker) => {
+            // Validate line number before accessing
+            if (marker.startLineNumber <= 0 || marker.startLineNumber > model.getLineCount()) {
+                return null;
+            }
+
             const lineContent = model.getLineContent(marker.startLineNumber);
 
             // Extract identifier from message: 'os' imported but unused -> os
@@ -1091,9 +1096,12 @@ export class LSPClient {
             this.unusedDecorations = new Map();
         }
 
+        // Filter out null decorations from validation failures
+        const validDecorations = decorations.filter((d) => d !== null);
+
         // Clear old decorations for this model
         const oldDecorations = this.unusedDecorations.get(model) || [];
-        const newDecorations = model.deltaDecorations(oldDecorations, decorations);
+        const newDecorations = model.deltaDecorations(oldDecorations, validDecorations);
         this.unusedDecorations.set(model, newDecorations);
     }
 
