@@ -161,58 +161,76 @@ export class FileOperationsAdvanced {
         const isOpenInLeft = this.context.openTabs.has(oldPath);
         const isOpenInRight = this.context.rightOpenTabs && this.context.rightOpenTabs.has(oldPath);
 
-        // Get model once before any disposal
-        let oldModel = null;
+        // Get model and content before any disposal
+        let leftOldModel = null;
+        let rightOldModel = null;
         let content = null;
         let language = null;
 
         if (isOpenInLeft) {
-            oldModel = this.context.openTabs.get(oldPath).model;
-            content = oldModel.getValue();
-            language = oldModel.getLanguageId();
-        } else if (isOpenInRight) {
-            oldModel = this.context.rightOpenTabs.get(oldPath).model;
-            content = oldModel.getValue();
-            language = oldModel.getLanguageId();
+            leftOldModel = this.context.openTabs.get(oldPath).model;
+            content = leftOldModel.getValue();
+            language = leftOldModel.getLanguageId();
         }
 
-        // Create new model once if file is open anywhere
-        let newModel = null;
-        if (oldModel) {
-            newModel = monaco.editor.createModel(content, language, monaco.Uri.file(newPath));
+        if (isOpenInRight) {
+            rightOldModel = this.context.rightOpenTabs.get(oldPath).model;
+            if (!content) {
+                content = rightOldModel.getValue();
+                language = rightOldModel.getLanguageId();
+            }
+        }
+
+        // Notify LSP: close old file, open new file (only once)
+        if (content) {
+            this.context.notifyDocumentClosed(oldPath);
+            this.context.notifyDocumentOpened(newPath, content);
         }
 
         // Update left editor if file is open
         if (isOpenInLeft) {
             const tabData = this.context.openTabs.get(oldPath);
 
-            // Update tab data
+            // Create new model for left editor
+            const newLeftModel = monaco.editor.createModel(
+                content,
+                language,
+                monaco.Uri.file(newPath)
+            );
+
+            // Remove old tab from DOM
+            const oldTab = document.querySelector(
+                `#tabBar [data-filepath="${oldPath}"], #tabBar [data-file="${oldPath}"]`
+            );
+            if (oldTab) {
+                oldTab.remove();
+            }
+
+            // Update tab data map
             this.context.openTabs.delete(oldPath);
             this.context.openTabs.set(newPath, {
                 ...tabData,
-                model: newModel,
+                model: newLeftModel,
             });
-            this.context.activeFile = newPath;
+
+            // Update active file reference
+            if (this.context.activeFile === oldPath) {
+                this.context.activeFile = newPath;
+            }
+
+            // Open new tab
+            if (this.context.tabManager) {
+                this.context.tabManager.openTab(newPath, tabData.isStdlib);
+            }
 
             // Update editor model
-            this.context.editor.setModel(newModel);
+            if (this.context.editor) {
+                this.context.editor.setModel(newLeftModel);
+            }
 
-            // Notify LSP: close old file, open new file
-            this.context.notifyDocumentClosed(oldPath);
-            this.context.notifyDocumentOpened(newPath, content);
-
-            // Update tab display
-            const tab = document.querySelector(
-                `#tabBar [data-filepath="${oldPath}"], #tabBar [data-file="${oldPath}"]`
-            );
-            if (tab) {
-                tab.setAttribute('data-filepath', newPath);
-                tab.setAttribute('data-file', newPath);
-                const label = tab.querySelector('.tab-label');
-                if (label) {
-                    label.textContent = newPath.split('/').pop();
-                    label.setAttribute('title', newPath);
-                }
+            // Dispose old left model
+            if (leftOldModel) {
+                leftOldModel.dispose();
             }
         }
 
@@ -220,40 +238,47 @@ export class FileOperationsAdvanced {
         if (isOpenInRight) {
             const tabData = this.context.rightOpenTabs.get(oldPath);
 
-            // Update tab data
+            // Create new model for right editor
+            const newRightModel = monaco.editor.createModel(
+                content,
+                language,
+                monaco.Uri.file(newPath)
+            );
+
+            // Remove old tab from DOM
+            const oldTab = document.querySelector(
+                `#tabBar2 [data-filepath="${oldPath}"], #tabBar2 [data-file="${oldPath}"]`
+            );
+            if (oldTab) {
+                oldTab.remove();
+            }
+
+            // Update tab data map
             this.context.rightOpenTabs.delete(oldPath);
             this.context.rightOpenTabs.set(newPath, {
                 ...tabData,
-                model: newModel,
+                model: newRightModel,
             });
 
+            // Update active file reference
             if (this.context.rightActiveFile === oldPath) {
                 this.context.rightActiveFile = newPath;
             }
 
+            // Open new tab
+            if (this.context.rightTabManager) {
+                this.context.rightTabManager.openTab(newPath, tabData.isStdlib);
+            }
+
             // Update right editor model if this file is currently active
             if (this.context.rightEditor && this.context.rightActiveFile === newPath) {
-                this.context.rightEditor.setModel(newModel);
+                this.context.rightEditor.setModel(newRightModel);
             }
 
-            // Update tab display for right editor
-            const tab = document.querySelector(
-                `#tabBar2 [data-filepath="${oldPath}"], #tabBar2 [data-file="${oldPath}"]`
-            );
-            if (tab) {
-                tab.setAttribute('data-filepath', newPath);
-                tab.setAttribute('data-file', newPath);
-                const label = tab.querySelector('.tab-label');
-                if (label) {
-                    label.textContent = newPath.split('/').pop();
-                    label.setAttribute('title', newPath);
-                }
+            // Dispose old right model
+            if (rightOldModel) {
+                rightOldModel.dispose();
             }
-        }
-
-        // Dispose old model only after both editors are updated
-        if (oldModel) {
-            oldModel.dispose();
         }
 
         // Update file path display bars for both editors (always update if file is active)

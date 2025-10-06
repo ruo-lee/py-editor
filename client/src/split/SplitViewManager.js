@@ -272,19 +272,31 @@ export class SplitViewManager {
                     this.context.openTabs.set(filepath, rightTabData);
                     this.context.tabManager.openTab(filepath, rightTabData.isStdlib);
                 } else {
-                    // File exists in both - sync content from right to left before disposing
+                    // File exists in both - check if they share the same model
                     const leftTabData = this.context.openTabs.get(filepath);
-                    if (leftTabData && leftTabData.model && rightTabData.model) {
-                        // Copy content from right to left
-                        const rightContent = rightTabData.model.getValue();
-                        if (leftTabData.model.getValue() !== rightContent) {
-                            leftTabData.model.setValue(rightContent);
-                        }
-                    }
+                    const sharedModel = leftTabData.model === rightTabData.model;
 
-                    // Dispose the right model to avoid memory leak
-                    if (rightTabData.model) {
-                        rightTabData.model.dispose();
+                    if (sharedModel) {
+                        // Same model instance - don't dispose, just sync content if needed
+                        if (leftTabData && leftTabData.model && rightTabData.model) {
+                            const rightContent = rightTabData.model.getValue();
+                            if (leftTabData.model.getValue() !== rightContent) {
+                                leftTabData.model.setValue(rightContent);
+                            }
+                        }
+                        // Don't dispose - left is still using it
+                    } else {
+                        // Different model instances - sync content and dispose right
+                        if (leftTabData && leftTabData.model && rightTabData.model) {
+                            const rightContent = rightTabData.model.getValue();
+                            if (leftTabData.model.getValue() !== rightContent) {
+                                leftTabData.model.setValue(rightContent);
+                            }
+                        }
+                        // Dispose the right model to avoid memory leak
+                        if (rightTabData.model) {
+                            rightTabData.model.dispose();
+                        }
                     }
                 }
             });
@@ -297,10 +309,13 @@ export class SplitViewManager {
                 }
             }
         } else {
-            // Not merging - just dispose right models
+            // Not merging - check if models are shared before disposing
             this.context.rightOpenTabs.forEach((rightTabData, filepath) => {
-                // If this file is open in both, dispose the right model
-                if (this.context.openTabs.has(filepath) && rightTabData.model) {
+                const leftTabData = this.context.openTabs.get(filepath);
+                const sharedModel = leftTabData && leftTabData.model === rightTabData.model;
+
+                // Only dispose if not shared with left editor
+                if (!sharedModel && rightTabData.model) {
                     rightTabData.model.dispose();
                 }
             });
