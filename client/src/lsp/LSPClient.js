@@ -861,19 +861,75 @@ export class LSPClient {
 
         // Convert LSP diagnostics to Monaco markers
         const markers = (params.diagnostics || []).map((diagnostic) => {
-            return {
+            let startCol = diagnostic.range.start.character + 1;
+            let endCol = diagnostic.range.end.character + 1;
+            const lineNumber = diagnostic.range.start.line + 1;
+
+            // Fix marker range for specific error types
+            const model = monaco.editor.getModel(
+                this.isStdlibFile(filePath)
+                    ? monaco.Uri.parse(`stdlib://${filePath}`)
+                    : monaco.Uri.file(filePath)
+            );
+
+            if (model) {
+                const lineContent = model.getLineContent(lineNumber);
+
+                // For unused code warnings
+                if (this.isUnusedCodeMessage(diagnostic.message)) {
+                    const identifier = this.extractIdentifierFromMessage(diagnostic.message);
+
+                    if (identifier) {
+                        const identifierIndex = lineContent.indexOf(identifier);
+                        if (identifierIndex !== -1) {
+                            startCol = identifierIndex + 1;
+                            endCol = startCol + identifier.length;
+                        }
+                    }
+                }
+                // For mypy module not found errors
+                else if (
+                    diagnostic.source === 'mypy' &&
+                    diagnostic.message.includes('Cannot find implementation or library stub')
+                ) {
+                    const moduleMatch = diagnostic.message.match(/module named "([^"]+)"/);
+                    if (moduleMatch) {
+                        const moduleName = moduleMatch[1];
+                        const moduleIndex = lineContent.indexOf(moduleName);
+                        if (moduleIndex !== -1) {
+                            startCol = moduleIndex + 1;
+                            endCol = startCol + moduleName.length;
+                        }
+                    }
+                }
+            }
+
+            const marker = {
                 severity: this.convertDiagnosticSeverity(diagnostic.severity),
-                startLineNumber: diagnostic.range.start.line + 1,
-                startColumn: diagnostic.range.start.character + 1,
+                startLineNumber: lineNumber,
+                startColumn: startCol,
                 endLineNumber: diagnostic.range.end.line + 1,
-                endColumn: diagnostic.range.end.character + 1,
+                endColumn: endCol,
                 message: diagnostic.message,
                 source: diagnostic.source || 'pylsp',
             };
+
+            // Add tags if present (LSP DiagnosticTag: Unnecessary=1, Deprecated=2)
+            if (diagnostic.tags && diagnostic.tags.length > 0) {
+                marker.tags = diagnostic.tags;
+            } else if (this.isUnusedCodeMessage(diagnostic.message)) {
+                // Fallback: Detect unused code from message pattern
+                marker.tags = [1]; // DiagnosticTag.Unnecessary
+            }
+
+            return marker;
         });
 
         // Set markers on the model
         monaco.editor.setModelMarkers(model, 'pylsp', markers);
+
+        // Apply unused code decorations
+        this.applyUnusedCodeDecorations(model, markers);
 
         // Update Problems panel if available
         if (this.onDiagnosticsUpdate) {
@@ -901,12 +957,146 @@ export class LSPClient {
     }
 
     /**
+     * Check if diagnostic message indicates unused code
+     */
+    isUnusedCodeMessage(message) {
+        const unusedPatterns = [
+            /imported but unused/i,
+            /assigned to but never used/i,
+            /defined but never used/i,
+            /is assigned but never used/i,
+        ];
+        return unusedPatterns.some((pattern) => pattern.test(message));
+    }
+
+    /**
+     * Extract identifier from diagnostic message
+     */
+    extractIdentifierFromMessage(message) {
+        const patterns = [
+            { regex: /^'([^']+)\.([^']+)' imported but unused/, group: 2 }, // typing.List -> List
+            { regex: /^'([^']+\.\*)' imported but unused/, group: 1 }, // local_codes.*
+            { regex: /^'([^']+)' imported but unused/, group: 1 }, // os -> os
+            { regex: /^local variable '([^']+)' is assigned to but never used/, group: 1 }, // data
+        ];
+
+        for (const { regex, group } of patterns) {
+            const match = message.match(regex);
+            if (match) {
+                return match[group];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Apply unused code decorations (grayed out style like VSCode)
+     */
+    applyUnusedCodeDecorations(model, markers) {
+        // Filter markers with Unnecessary tag (tag=1)
+        const unusedMarkers = markers.filter(
+            (marker) => marker.tags && marker.tags.includes(1) // LSP DiagnosticTag.Unnecessary = 1
+        );
+
+        // Create decorations for unused code - apply opacity to specific word only
+        const decorations = unusedMarkers.map((marker) => {
+            const lineContent = model.getLineContent(marker.startLineNumber);
+
+            // Extract identifier from message: 'os' imported but unused -> os
+            let identifier = null;
+            const patterns = [
+                /^'([^']+)' imported but unused/,
+                /^'([^']+\.([^']+))' imported but unused/, // typing.List -> List
+                /^local variable '([^']+)' is assigned to but never used/,
+                /^'([^']+\.\*)' imported but unused/, // local_codes.*
+            ];
+
+            for (const pattern of patterns) {
+                const match = marker.message.match(pattern);
+                if (match) {
+                    identifier = match[2] || match[1]; // Use captured group 2 if exists (for typing.List)
+                    break;
+                }
+            }
+
+            if (!identifier) {
+                // Fallback to marker range
+                return {
+                    range: new monaco.Range(
+                        marker.startLineNumber,
+                        marker.startColumn,
+                        marker.endLineNumber,
+                        marker.endColumn
+                    ),
+                    options: {
+                        inlineClassName: 'unused-code',
+                        stickiness:
+                            monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+                    },
+                };
+            }
+
+            // Find identifier position in line
+            const identifierIndex = lineContent.indexOf(identifier);
+            if (identifierIndex === -1) {
+                // Not found, use marker range
+                return {
+                    range: new monaco.Range(
+                        marker.startLineNumber,
+                        marker.startColumn,
+                        marker.endLineNumber,
+                        marker.endColumn
+                    ),
+                    options: {
+                        inlineClassName: 'unused-code',
+                        stickiness:
+                            monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+                    },
+                };
+            }
+
+            // Create decoration for exact identifier position
+            const startCol = identifierIndex + 1;
+            const endCol = startCol + identifier.length;
+
+            return {
+                range: new monaco.Range(
+                    marker.startLineNumber,
+                    startCol,
+                    marker.endLineNumber,
+                    endCol
+                ),
+                options: {
+                    className: 'unused-code-decoration',
+                    inlineClassName: 'unused-code-inline',
+                    stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+                },
+            };
+        });
+
+        // Store decoration IDs per model to clean up later
+        if (!this.unusedDecorations) {
+            this.unusedDecorations = new Map();
+        }
+
+        // Clear old decorations for this model
+        const oldDecorations = this.unusedDecorations.get(model) || [];
+        const newDecorations = model.deltaDecorations(oldDecorations, decorations);
+        this.unusedDecorations.set(model, newDecorations);
+    }
+
+    /**
      * Disconnect from LSP server
      */
     disconnect() {
         if (this.languageClient) {
             this.languageClient.close();
             this.languageClient = null;
+        }
+
+        // Clear unused decorations
+        if (this.unusedDecorations) {
+            this.unusedDecorations.clear();
         }
     }
 }

@@ -140,3 +140,18 @@ body.light-theme .editor-placeholder {
 .monaco-editor .decorationsOverviewRuler {
     z-index: 1;
 }
+
+/* Unused code styling - opacity only (VSCode style) */
+/* className applies to the entire decoration line */
+.monaco-editor .unused-code-decoration {
+    /* Don't apply styles here - it affects whole line */
+}
+
+/* inlineClassName applies to the specific range */
+.monaco-editor .view-line span.unused-code-inline {
+    opacity: 0.5 !important;
+}
+
+body.light-theme .monaco-editor .view-line span.unused-code-inline {
+    opacity: 0.6 !important;
+}
