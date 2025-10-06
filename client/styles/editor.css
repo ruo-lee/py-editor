@@ -4,6 +4,23 @@
     min-width: 0;
 }
 
+/* Fix Monaco Find widget focus issues */
+.find-widget[aria-hidden="true"] {
+    aria-hidden: false !important;
+}
+
+.find-widget .monaco-inputbox,
+.find-widget .input,
+.find-widget textarea {
+    pointer-events: auto !important;
+}
+
+/* Ensure Find widget input is always focusable */
+.find-widget .monaco-inputbox .input {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
 .editor-area.split-view {
     flex-direction: row; /* Split view mode */
 }

@@ -137,6 +137,11 @@ export function getDefaultEditorOptions(theme = 'vs-dark', readOnly = false) {
             multiple: 'goto',
         },
         links: true, // Enable Ctrl+Click to follow links (go to definition)
+        find: {
+            addExtraSpaceOnTop: false,
+            autoFindInSelection: 'never',
+            seedSearchStringFromSelection: 'always',
+        },
     };
 }
 
