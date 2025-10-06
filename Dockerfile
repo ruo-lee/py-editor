@@ -1,4 +1,4 @@
-FROM python:3.11-alpine
+FROM python:3.11.11-alpine
 
 # Install Node.js
 RUN apk add --no-cache nodejs npm
