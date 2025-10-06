@@ -1,5 +1,6 @@
 import * as monaco from 'monaco-editor';
 import { getLanguageFromFile } from '../utils/fileIcons.js';
+import { getModelRefCounter } from '../utils/modelRefCounter.js';
 
 /**
  * FileLoader - Handles file loading and opening operations
@@ -11,6 +12,8 @@ export class FileLoader {
         this.modelChangeListeners = new Map();
         // Track debounce timers for LSP notifications
         this.lspNotifyTimers = new Map();
+        // Get model reference counter
+        this.modelRefCounter = getModelRefCounter();
     }
 
     /**
@@ -62,13 +65,21 @@ export class FileLoader {
     }
 
     /**
-     * Cleanup model change listener
+     * Cleanup model change listener and timer
      */
     cleanupModelListener(modelUri) {
         const listener = this.modelChangeListeners.get(modelUri);
         if (listener) {
             listener.dispose();
             this.modelChangeListeners.delete(modelUri);
+        }
+
+        // Clear any pending LSP notification timers
+        // Extract filepath from URI for timer cleanup
+        const filepath = modelUri.replace('file:///', '').replace('stdlib://', '');
+        if (this.lspNotifyTimers.has(filepath)) {
+            clearTimeout(this.lspNotifyTimers.get(filepath));
+            this.lspNotifyTimers.delete(filepath);
         }
     }
 
@@ -179,6 +190,7 @@ export class FileLoader {
                 ? monaco.Uri.parse(`stdlib://${filepath}`)
                 : monaco.Uri.file(filepath);
             let model = monaco.editor.getModel(modelUri);
+            let modelInfo;
 
             if (!model) {
                 // Create new model only if it doesn't exist
@@ -190,6 +202,17 @@ export class FileLoader {
 
                 // Setup model-level change tracking for non-stdlib files
                 if (!isStdlib) {
+                    this.setupModelChangeTracking(model, filepath);
+                }
+
+                // Add to reference counter
+                modelInfo = this.modelRefCounter.addReference(model, filepath);
+            } else {
+                // Model exists - increment reference count
+                modelInfo = this.modelRefCounter.addReference(model, filepath);
+
+                // If model already exists but change tracking not set up, set it up now
+                if (!isStdlib && !this.modelChangeListeners.has(modelUri.toString())) {
                     this.setupModelChangeTracking(model, filepath);
                 }
             }
