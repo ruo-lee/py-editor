@@ -41,14 +41,18 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0; /* Enable proper flex shrinking */
+    height: 100%; /* Explicit height for flex calculation */
 }
 
 /* Editor area takes remaining space after panel */
 .editor-workspace > .editor-area {
-    flex: 1 1 auto;
+    flex: 1 1 0 !important; /* Force flex to always use remaining space */
     display: flex;
     overflow: hidden;
     min-height: 0; /* Allow flex item to shrink */
+    max-height: 100%; /* Prevent overflow */
+    position: relative; /* For proper layout calculation */
 }
 
 /* When collapsed, show only header */

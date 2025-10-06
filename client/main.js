@@ -790,7 +790,7 @@ class PythonIDE {
     }
 
     setupOutputPanelResize(resizer, outputPanel) {
-        this.resizeManager.setupOutputPanelResize(resizer, outputPanel);
+        this.resizeManager.setupOutputPanelResize(resizer, outputPanel, this);
     }
 
     async openFileInSplit(filepath) {

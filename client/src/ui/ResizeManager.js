@@ -59,10 +59,47 @@ export class ResizeManager {
     /**
      * Setup output panel resize handler
      */
-    setupOutputPanelResize(resizer, outputPanel) {
+    setupOutputPanelResize(resizer, outputPanel, context) {
         let isDragging = false;
         let startY = 0;
         let startHeight = 0;
+
+        const updateEditorLayout = (panelHeight) => {
+            const workspace = outputPanel.parentElement;
+            if (!workspace) return;
+
+            const workspaceHeight = workspace.offsetHeight;
+            const editorAreaHeight = workspaceHeight - panelHeight;
+
+            // Account for tab bar (35px + 1px border) and file path bar (24px)
+            const TAB_BAR_HEIGHT = 36;
+            const FILE_PATH_BAR_HEIGHT = 24;
+            const editorHeight = editorAreaHeight - TAB_BAR_HEIGHT - FILE_PATH_BAR_HEIGHT;
+
+            requestAnimationFrame(() => {
+                if (context && context.editor) {
+                    const editorArea = document.getElementById('editorArea');
+                    if (editorArea) {
+                        const rect = editorArea.getBoundingClientRect();
+                        context.editor.layout({
+                            width: rect.width,
+                            height: editorHeight,
+                        });
+                    }
+                }
+
+                if (context && context.rightEditor) {
+                    const editorArea = document.getElementById('editorArea');
+                    if (editorArea) {
+                        const rect = editorArea.getBoundingClientRect();
+                        context.rightEditor.layout({
+                            width: rect.width / 2,
+                            height: editorHeight,
+                        });
+                    }
+                }
+            });
+        };
 
         const onMouseMove = (e) => {
             if (!isDragging) return;
@@ -80,7 +117,7 @@ export class ResizeManager {
 
             const clampedHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
 
-            // Update flex immediately (no transition delay)
+            // Update panel flex
             outputPanel.style.flex = `0 0 ${clampedHeight}px`;
 
             // Update collapsed state based on height
@@ -92,6 +129,14 @@ export class ResizeManager {
                 outputPanel.classList.remove('collapsed');
             }
 
+            // Don't set editorArea flex - let CSS handle it automatically
+            // The CSS rule .editor-workspace > .editor-area { flex: 1 1 0 !important; }
+            // will ensure it takes remaining space
+
+            // Update editor layout after DOM updates with actual panel height
+            const actualPanelHeight = clampedHeight <= 35 ? 30 : clampedHeight;
+            updateEditorLayout(actualPanelHeight);
+
             e.preventDefault();
         };
 
@@ -100,6 +145,10 @@ export class ResizeManager {
             document.body.style.cursor = '';
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
+
+            // Final layout update on mouse up with current panel height
+            const currentPanelHeight = outputPanel.offsetHeight;
+            updateEditorLayout(currentPanelHeight);
         };
 
         const onMouseDown = (e) => {

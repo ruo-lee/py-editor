@@ -199,7 +199,11 @@ export class EventManager {
         }
 
         if (outputPanelResizer && this.context.outputPanel) {
-            this.context.setupOutputPanelResize(outputPanelResizer, this.context.outputPanel);
+            this.context.setupOutputPanelResize(
+                outputPanelResizer,
+                this.context.outputPanel,
+                this.context
+            );
         }
     }
 

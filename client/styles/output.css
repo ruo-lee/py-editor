@@ -1,6 +1,7 @@
 /* Output panel styles */
 .output-panel {
     flex: 0 0 200px; /* Fixed 200px, no grow/shrink by default */
+    flex-shrink: 0; /* Prevent unwanted shrinking */
     min-height: 30px; /* Minimum: header only */
     max-height: 80%; /* Maximum: 80% of workspace */
     background: var(--vscode-panel-background);
@@ -8,6 +9,7 @@
     display: flex;
     flex-direction: column;
     position: relative; /* For absolute positioned resizer */
+    z-index: 1; /* Ensure panel stays on top */
 }
 
 /* Collapsed state - only header visible */
