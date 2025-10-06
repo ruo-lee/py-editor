@@ -91,7 +91,12 @@ export class LSPReferencesProvider {
 
             // Check if reference is from current workspace
             if (uri.startsWith('file:///app/workspace/')) {
-                const pathAfterWorkspace = uri.replace('file:///app/workspace/', '');
+                const encodedPath = uri.replace('file:///app/workspace/', '');
+                // Decode URI components to handle non-ASCII filenames (e.g., Korean)
+                const pathAfterWorkspace = encodedPath
+                    .split('/')
+                    .map((component) => decodeURIComponent(component))
+                    .join('/');
 
                 // Reference is in current workspace if:
                 // 1. It starts with current workspace folder name
@@ -122,8 +127,13 @@ export class LSPReferencesProvider {
 
                 // Handle file:// URIs
                 if (filePath.startsWith('file:///app/workspace/')) {
-                    // Remove file:///app/workspace/ prefix
-                    filePath = filePath.replace('file:///app/workspace/', '');
+                    // Remove file:///app/workspace/ prefix and decode URI components
+                    const encodedPath = filePath.replace('file:///app/workspace/', '');
+                    // Decode each path component to handle non-ASCII filenames (e.g., Korean)
+                    filePath = encodedPath
+                        .split('/')
+                        .map((component) => decodeURIComponent(component))
+                        .join('/');
 
                     // Remove workspace folder prefix if present
                     // e.g., "a5555/sandboxes/file.py" -> "sandboxes/file.py"
@@ -148,7 +158,13 @@ export class LSPReferencesProvider {
                 // If we can't get preview, still include the reference with normalized path
                 let filePath = ref.uri;
                 if (filePath.startsWith('file:///app/workspace/')) {
-                    filePath = filePath.replace('file:///app/workspace/', '');
+                    // Remove file:///app/workspace/ prefix and decode URI components
+                    const encodedPath = filePath.replace('file:///app/workspace/', '');
+                    // Decode each path component to handle non-ASCII filenames (e.g., Korean)
+                    filePath = encodedPath
+                        .split('/')
+                        .map((component) => decodeURIComponent(component))
+                        .join('/');
                     const workspaceFolder = this.context.workspaceFolder;
                     if (workspaceFolder && filePath.startsWith(workspaceFolder + '/')) {
                         filePath = filePath.substring(workspaceFolder.length + 1);

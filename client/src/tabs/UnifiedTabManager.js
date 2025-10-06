@@ -277,7 +277,7 @@ export class UnifiedTabManager {
      * @param {string} filepath - Path of file to close
      * @param {boolean} disposeModel - Whether to dispose the Monaco model (default: true)
      */
-    closeTab(filepath, disposeModel = true) {
+    closeTab(filepath, disposeModel = true, clearEditor = true) {
         const tabContainer = this.getTabContainer();
         if (!tabContainer) return;
 
@@ -302,6 +302,10 @@ export class UnifiedTabManager {
 
             // Only dispose if not used in other editor
             if (!isUsedInOtherEditor) {
+                // Cleanup model listener before disposing
+                if (this.context.fileLoader) {
+                    this.context.fileLoader.cleanupModelListener(tabData.model.uri.toString());
+                }
                 tabData.model.dispose();
             }
         }
@@ -318,7 +322,8 @@ export class UnifiedTabManager {
                 this.switchTab(nextFilepath);
             } else {
                 this.setActiveFile(null);
-                if (editor) {
+                // Only clear editor if clearEditor is true (default behavior)
+                if (clearEditor && editor) {
                     editor.setModel(null);
                 }
                 // Clear file path bar when no tabs remain
@@ -454,7 +459,9 @@ export class UnifiedTabManager {
     setupTabDragHandlers(tab, filepath) {
         tab.addEventListener('dragstart', (e) => {
             e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', filepath);
+            // Read filepath from tab element to handle renamed files
+            const currentFilepath = tab.dataset.filepath || tab.dataset.file || filepath;
+            e.dataTransfer.setData('text/plain', currentFilepath);
             e.dataTransfer.setData('editor-group', this.editorId);
             tab.classList.add('dragging');
         });

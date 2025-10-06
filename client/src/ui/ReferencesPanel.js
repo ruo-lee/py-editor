@@ -149,7 +149,13 @@ export class ReferencesPanel {
 
             // Normalize file path
             if (filePath.startsWith('file:///app/workspace/')) {
-                filePath = filePath.replace('file:///app/workspace/', '');
+                // Remove file:///app/workspace/ prefix and decode URI components
+                const encodedPath = filePath.replace('file:///app/workspace/', '');
+                // Decode each path component to handle non-ASCII filenames (e.g., Korean)
+                filePath = encodedPath
+                    .split('/')
+                    .map((component) => decodeURIComponent(component))
+                    .join('/');
             } else if (filePath.startsWith('file://')) {
                 filePath = filePath.replace('file://', '');
             }

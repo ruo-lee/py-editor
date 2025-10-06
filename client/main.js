@@ -23,9 +23,11 @@ import { ImprovedLSPIntegration } from './src/lsp/ImprovedLSPIntegration.js';
 import { FileUploadManager } from './src/upload/FileUploadManager.js';
 import { TabContextMenuManager } from './src/tabs/TabContextMenuManager.js';
 import { TabDragDropManager } from './src/tabs/TabDragDropManager.js';
-import { ModelSyncManager } from './src/sync/ModelSyncManager.js';
 import { WorkspaceManager } from './src/ui/WorkspaceManager.js';
 import { TemplateSelector } from './src/ui/TemplateSelector.js';
+import { FormatManager } from './src/editor/FormatManager.js';
+import { TypeCheckManager } from './src/editor/TypeCheckManager.js';
+import { ProblemsManager } from './src/ui/ProblemsManager.js';
 import { getFileIcon } from './src/utils/fileIcons.js';
 import {
     closeAllDialogs,
@@ -94,6 +96,9 @@ class PythonIDE {
         this.dialogManager = new DialogManager();
         this.codeExecutor = new CodeExecutor(this);
         this.contextMenuInstance = new ContextMenu();
+        this.formatManager = new FormatManager(this);
+        this.typeCheckManager = new TypeCheckManager(this);
+        this.problemsManager = new ProblemsManager(this);
 
         // Apply theme after ThemeManager is initialized
         this.applyTheme(this.currentTheme);
@@ -150,7 +155,6 @@ class PythonIDE {
         // rightTabManager will be initialized when split view is created
         this.rightTabManager = null;
         this.tabDragDropManager = new TabDragDropManager(this);
-        this.modelSyncManager = new ModelSyncManager(this);
         this.workspaceManager = new WorkspaceManager(this);
         this.completionManager = new CompletionManager(this);
         this.validationManager = new ValidationManager(this);
@@ -211,6 +215,11 @@ class PythonIDE {
         // Initialize LSPClient with snippets and fallback validation
         this.lspClientInstance = new LSPClient(this.snippets, () => this.setupBasicValidation());
 
+        // Connect LSP diagnostics to Problems panel
+        this.lspClientInstance.onDiagnosticsUpdate = (filepath, markers) => {
+            this.problemsManager.updateDiagnostics(filepath, markers);
+        };
+
         // Set callback to register providers AFTER LSP is fully initialized
         this.lspClientInstance.onInitialized = () => {
             this.lspProviderManager.registerAllProviders();
@@ -218,6 +227,10 @@ class PythonIDE {
             // Setup improved LSP integration with validation and Find References
             this.improvedLSP = new ImprovedLSPIntegration(this);
             this.improvedLSP.setup();
+
+            // Initialize format and type check managers after LSP is connected
+            this.formatManager.initialize();
+            this.typeCheckManager.initialize();
         };
 
         // Keep reference to languageClient for backward compatibility
@@ -528,11 +541,12 @@ class PythonIDE {
     }
 
     handleTabClose(filepath) {
-        // Cleanup sync listener if exists
-        this.cleanupSyncListener(filepath);
-
         const tabData = this.openTabs.get(filepath);
         if (tabData) {
+            // Cleanup model listener before disposing
+            if (this.fileLoader) {
+                this.fileLoader.cleanupModelListener(tabData.model.uri.toString());
+            }
             tabData.model.dispose();
             this.openTabs.delete(filepath);
         }
@@ -546,6 +560,11 @@ class PythonIDE {
                 this.activeFile = null;
                 this.editor.setModel(null);
                 this.executeButton.style.display = 'none';
+
+                // Hide format button when no files are open
+                if (this.formatManager) {
+                    this.formatManager.updateVisibility(false);
+                }
             }
         }
     }
@@ -575,14 +594,14 @@ class PythonIDE {
                     this.executeButton.style.display =
                         isPython && !tabData.isStdlib ? 'block' : 'none';
 
+                    // Update format button visibility
+                    if (this.formatManager) {
+                        this.formatManager.updateVisibility(isPython && !tabData.isStdlib);
+                    }
+
                     // Hide references panel when switching tabs (UX improvement)
                     if (this.referencesPanel) {
                         this.referencesPanel.hide('left');
-                    }
-
-                    // Setup sync if same file is open in both editors
-                    if (this.splitViewActive) {
-                        this.setupModelSync(filepath);
                     }
                 }
             } else {
@@ -765,7 +784,7 @@ class PythonIDE {
     }
 
     setupOutputPanelResize(resizer, outputPanel) {
-        this.resizeManager.setupOutputPanelResize(resizer, outputPanel);
+        this.resizeManager.setupOutputPanelResize(resizer, outputPanel, this);
     }
 
     async openFileInSplit(filepath) {
@@ -778,11 +797,9 @@ class PythonIDE {
 
     switchToTabInSplit(filepath) {
         this.rightTabManager.switchToTabInSplit(filepath);
-        this.setupModelSync(filepath);
     }
 
     closeTabInSplit(filepath) {
-        this.cleanupSyncListener(filepath);
         this.rightTabManager.closeTabInSplit(filepath);
         if (this.rightOpenTabs.size === 0) {
             this.closeSplitView();
@@ -803,18 +820,6 @@ class PythonIDE {
 
     closeSplitView(mergeTabsToLeft = false) {
         this.splitViewManager.closeSplitView(mergeTabsToLeft);
-    }
-
-    setupModelSync(filepath) {
-        this.modelSyncManager.setupModelSync(filepath);
-    }
-
-    cleanupSyncListener(filepath) {
-        this.modelSyncManager.cleanupSyncListener(filepath);
-    }
-
-    cleanupAllSyncListeners() {
-        this.modelSyncManager.cleanupAllSyncListeners();
     }
 
     toggleSplit() {

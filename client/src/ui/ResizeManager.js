@@ -59,10 +59,47 @@ export class ResizeManager {
     /**
      * Setup output panel resize handler
      */
-    setupOutputPanelResize(resizer, outputPanel) {
+    setupOutputPanelResize(resizer, outputPanel, context) {
         let isDragging = false;
         let startY = 0;
         let startHeight = 0;
+
+        const updateEditorLayout = (panelHeight) => {
+            const workspace = outputPanel.parentElement;
+            if (!workspace) return;
+
+            const workspaceHeight = workspace.offsetHeight;
+            const editorAreaHeight = workspaceHeight - panelHeight;
+
+            // Account for tab bar (35px + 1px border) and file path bar (24px)
+            const TAB_BAR_HEIGHT = 36;
+            const FILE_PATH_BAR_HEIGHT = 24;
+            const editorHeight = editorAreaHeight - TAB_BAR_HEIGHT - FILE_PATH_BAR_HEIGHT;
+
+            requestAnimationFrame(() => {
+                if (context && context.editor) {
+                    const editorArea = document.getElementById('editorArea');
+                    if (editorArea) {
+                        const rect = editorArea.getBoundingClientRect();
+                        context.editor.layout({
+                            width: rect.width,
+                            height: editorHeight,
+                        });
+                    }
+                }
+
+                if (context && context.rightEditor) {
+                    const editorArea = document.getElementById('editorArea');
+                    if (editorArea) {
+                        const rect = editorArea.getBoundingClientRect();
+                        context.rightEditor.layout({
+                            width: rect.width / 2,
+                            height: editorHeight,
+                        });
+                    }
+                }
+            });
+        };
 
         const onMouseMove = (e) => {
             if (!isDragging) return;
@@ -70,13 +107,35 @@ export class ResizeManager {
             const deltaY = startY - e.clientY;
             const newHeight = startHeight + deltaY;
 
-            // Enforce minimum and maximum heights
-            const minHeight = 100;
-            const maxHeight = window.innerHeight - 300;
+            // Get workspace height for proper max calculation
+            const workspace = outputPanel.parentElement;
+            const workspaceHeight = workspace ? workspace.offsetHeight : window.innerHeight;
 
-            if (newHeight >= minHeight && newHeight <= maxHeight) {
-                outputPanel.style.height = `${newHeight}px`;
+            // Enforce minimum and maximum heights
+            const minHeight = 30; // Can collapse to header only
+            const maxHeight = workspaceHeight * 0.8; // 80% of workspace
+
+            const clampedHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+
+            // Update panel flex
+            outputPanel.style.flex = `0 0 ${clampedHeight}px`;
+
+            // Update collapsed state based on height
+            if (clampedHeight <= 35) {
+                // Small threshold for collapse
+                outputPanel.classList.add('collapsed');
+                outputPanel.style.flex = '0 0 30px';
+            } else {
+                outputPanel.classList.remove('collapsed');
             }
+
+            // Don't set editorArea flex - let CSS handle it automatically
+            // The CSS rule .editor-workspace > .editor-area { flex: 1 1 0 !important; }
+            // will ensure it takes remaining space
+
+            // Update editor layout after DOM updates with actual panel height
+            const actualPanelHeight = clampedHeight <= 35 ? 30 : clampedHeight;
+            updateEditorLayout(actualPanelHeight);
 
             e.preventDefault();
         };
@@ -86,6 +145,10 @@ export class ResizeManager {
             document.body.style.cursor = '';
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
+
+            // Final layout update on mouse up with current panel height
+            const currentPanelHeight = outputPanel.offsetHeight;
+            updateEditorLayout(currentPanelHeight);
         };
 
         const onMouseDown = (e) => {

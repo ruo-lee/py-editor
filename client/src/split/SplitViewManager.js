@@ -151,6 +151,11 @@ export class SplitViewManager {
             this.context.improvedLSP.refreshShortcuts();
         }
 
+        // Initialize FormatManager for right editor
+        if (this.context.formatManager && this.context.formatManager.initializeRightEditor) {
+            this.context.formatManager.initializeRightEditor();
+        }
+
         // Update button icon
         this.context.updateSplitButtonIcon();
     }
@@ -159,34 +164,11 @@ export class SplitViewManager {
      * Setup right editor event listeners
      */
     setupRightEditorListeners() {
-        // Setup content change tracking for right editor (prevent stdlib didChange errors)
-        this.context.rightEditor.onDidChangeModelContent((_event) => {
-            const model = this.context.rightEditor.getModel();
-            if (!model) return;
+        // NOTE: Content change tracking is now handled at MODEL level (in FileLoader)
+        // to prevent duplicate notifications when the same model is used in split editors.
+        // Saved state updates are also handled at model level.
 
-            const uri = model.uri.toString();
-
-            // Skip stdlib files - they use stdlib:// URI scheme
-            if (uri.startsWith('stdlib://')) {
-                return;
-            }
-
-            let filePath = uri
-                .replace('file://', '')
-                .replace('inmemory://', '')
-                .replace('_split', '');
-
-            if (!filePath && this.context.rightActiveFile) {
-                filePath = this.context.rightActiveFile;
-            }
-
-            if (filePath) {
-                this.context.saveFile(filePath);
-                const content = model.getValue();
-                this.context.notifyDocumentChanged(filePath, content);
-                this.context.debouncedSyntaxCheck();
-            }
-        });
+        // No editor-level listeners needed here anymore
 
         // Handle Ctrl+Click for go-to-definition manually
         this.context.rightEditor.onMouseDown(async (e) => {
@@ -254,12 +236,80 @@ export class SplitViewManager {
     closeSplitView(mergeTabsToLeft = true) {
         if (!this.context.splitViewActive) return;
 
+        // No need to cleanup sync listeners - models are shared, no sync needed
+
+        // Clear right editor model first to prevent disposed model access
+        if (this.context.rightEditor) {
+            this.context.rightEditor.setModel(null);
+        }
+
         // Merge right tabs to left by default
         if (mergeTabsToLeft && this.context.rightOpenTabs.size > 0) {
-            this.context.rightOpenTabs.forEach((tabData, filepath) => {
+            const rightFiles = Array.from(this.context.rightOpenTabs.entries());
+
+            rightFiles.forEach(([filepath, rightTabData]) => {
                 if (!this.context.openTabs.has(filepath)) {
-                    this.context.openTabs.set(filepath, tabData);
-                    this.context.tabManager.openTab(filepath, tabData.isStdlib);
+                    // File only exists in right - move to left with undo/redo history intact
+                    this.context.openTabs.set(filepath, {
+                        ...rightTabData,
+                        model: rightTabData.model, // Keep the same model with its history
+                    });
+
+                    // Open tab in left editor
+                    this.context.tabManager.openTab(filepath, rightTabData.isStdlib);
+                } else {
+                    // File exists in both
+                    const leftTabData = this.context.openTabs.get(filepath);
+                    const sharedModel = leftTabData.model === rightTabData.model;
+
+                    if (sharedModel) {
+                        // Same model instance - already in sync, nothing to do
+                        // Don't dispose - left is still using it
+                    } else {
+                        // Different model instances (shouldn't happen with new design, but handle it)
+                        // Sync content from right to left
+                        if (leftTabData && leftTabData.model && rightTabData.model) {
+                            const rightContent = rightTabData.model.getValue();
+                            if (leftTabData.model.getValue() !== rightContent) {
+                                leftTabData.model.setValue(rightContent);
+                            }
+                        }
+                        // Dispose the right model to avoid memory leak
+                        if (rightTabData.model) {
+                            // Cleanup model listener before disposing
+                            if (this.context.fileLoader) {
+                                this.context.fileLoader.cleanupModelListener(
+                                    rightTabData.model.uri.toString()
+                                );
+                            }
+                            rightTabData.model.dispose();
+                        }
+                    }
+                }
+            });
+
+            // Switch to the last active file from right if no left file was active
+            if (!this.context.activeFile && this.context.rightActiveFile) {
+                const lastRightFile = this.context.rightActiveFile;
+                if (this.context.openTabs.has(lastRightFile)) {
+                    this.context.tabManager.switchTab(lastRightFile);
+                }
+            }
+        } else {
+            // Not merging - check if models are shared before disposing
+            this.context.rightOpenTabs.forEach((rightTabData, filepath) => {
+                const leftTabData = this.context.openTabs.get(filepath);
+                const sharedModel = leftTabData && leftTabData.model === rightTabData.model;
+
+                // Only dispose if not shared with left editor
+                if (!sharedModel && rightTabData.model) {
+                    // Cleanup model listener before disposing
+                    if (this.context.fileLoader) {
+                        this.context.fileLoader.cleanupModelListener(
+                            rightTabData.model.uri.toString()
+                        );
+                    }
+                    rightTabData.model.dispose();
                 }
             });
         }
@@ -281,6 +331,7 @@ export class SplitViewManager {
         if (leftGroup) {
             leftGroup.id = '';
             leftGroup.classList.add('focused'); // Restore focus when closing split
+            leftGroup.style.width = ''; // Reset width to default
         }
 
         // Remove split view class
@@ -336,19 +387,33 @@ export class SplitViewManager {
             return;
         }
 
-        // Check if file is already open in left editor - if so, share the model
+        // Check if file is already open in left editor
         if (this.context.openTabs.has(filepath)) {
-            const tabData = this.context.openTabs.get(filepath);
-            this.context.rightOpenTabs.set(filepath, tabData); // Share the same model
+            const leftTabData = this.context.openTabs.get(filepath);
+
+            // Share the same model between left and right editors
+            // This eliminates the need for sync and preserves undo/redo history
+            const sharedModel = leftTabData.model;
+            const isStdlib = leftTabData.isStdlib;
+
+            // Store in right tabs with SHARED model
+            this.context.rightOpenTabs.set(filepath, {
+                model: sharedModel,
+                saved: leftTabData.saved,
+                isStdlib: isStdlib,
+            });
 
             if (this.context.rightTabManager) {
-                this.context.rightTabManager.openTab(filepath, tabData.isStdlib);
+                this.context.rightTabManager.openTab(filepath, isStdlib);
 
-                // Explicitly set the model on the right editor
-                if (this.context.rightEditor && tabData.model) {
-                    this.context.rightEditor.setModel(tabData.model);
+                // Set the SHARED model on the right editor
+                if (this.context.rightEditor && sharedModel) {
+                    this.context.rightEditor.setModel(sharedModel);
                 }
             }
+
+            // No need for model sync when sharing the same model
+            // Both editors automatically stay in sync
 
             // Update placeholder visibility
             this.updatePlaceholderVisibility();
@@ -400,6 +465,11 @@ export class SplitViewManager {
                     getLanguageFromFile(filepath),
                     modelUri
                 );
+
+                // Setup model-level change tracking for non-stdlib files
+                if (!isStdlib && this.context.fileLoader) {
+                    this.context.fileLoader.setupModelChangeTracking(model, filepath);
+                }
             }
 
             this.context.rightOpenTabs.set(filepath, {
@@ -418,8 +488,7 @@ export class SplitViewManager {
                 this.context.rightTabManager.openTab(filepath, isStdlib);
             }
 
-            // Setup model sync
-            this.context.setupModelSync(filepath);
+            // No model sync needed - file only exists in right editor
 
             // Update placeholder visibility
             this.updatePlaceholderVisibility();

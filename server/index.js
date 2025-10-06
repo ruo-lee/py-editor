@@ -39,15 +39,31 @@ wss.on('connection', (ws) => {
     let pylsp = null;
     let messageBuffer = '';
     let pendingRequests = new Map();
+    const MAX_BUFFER_SIZE = 1024 * 1024; // 1MB buffer limit for memory optimization
+    const REQUEST_TIMEOUT = 30000; // 30 seconds timeout for pending requests
+
+    // Periodic cleanup of stale pending requests for memory optimization
+    const cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        for (const [id, reqData] of pendingRequests.entries()) {
+            if (typeof reqData === 'object' && now - reqData.timestamp > REQUEST_TIMEOUT) {
+                logger.debug('Removing stale request', { id, method: reqData.method });
+                pendingRequests.delete(id);
+            }
+        }
+    }, 60000); // Run every minute
 
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
             logger.debug('Received LSP message', { method: data.method, id: data.id });
 
-            // Store pending requests for debugging
+            // Store pending requests with timestamp for cleanup
             if (data.id && data.method) {
-                pendingRequests.set(data.id, data.method);
+                pendingRequests.set(data.id, {
+                    method: data.method,
+                    timestamp: Date.now(),
+                });
             }
 
             if (data.method === 'initialize') {
@@ -98,6 +114,16 @@ wss.on('connection', (ws) => {
                 pylsp.stdout.on('data', (chunk) => {
                     try {
                         messageBuffer += chunk.toString();
+
+                        // Memory optimization: limit buffer size to prevent memory bloat
+                        if (messageBuffer.length > MAX_BUFFER_SIZE) {
+                            logger.warn('Message buffer exceeded limit, clearing old data', {
+                                bufferLength: messageBuffer.length,
+                            });
+                            // Keep only the last 100KB to avoid losing incomplete messages
+                            messageBuffer = messageBuffer.slice(-100 * 1024);
+                        }
+
                         logger.debug('Received chunk from pylsp', {
                             bufferLength: messageBuffer.length,
                         });
@@ -145,12 +171,15 @@ wss.on('connection', (ws) => {
                             try {
                                 const response = JSON.parse(content);
 
-                                // Get the original request method
-                                const originalMethod = response.id
-                                    ? pendingRequests.get(response.id)
-                                    : null;
-                                if (response.id && originalMethod) {
-                                    pendingRequests.delete(response.id);
+                                // Get the original request method and clean up
+                                let originalMethod = null;
+                                if (response.id) {
+                                    const reqData = pendingRequests.get(response.id);
+                                    originalMethod =
+                                        typeof reqData === 'object' ? reqData.method : reqData;
+                                    if (reqData) {
+                                        pendingRequests.delete(response.id);
+                                    }
                                 }
 
                                 logger.debug('Sending LSP response', {
@@ -209,6 +238,10 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         logger.info('Language server client disconnected');
+
+        // Cleanup interval to prevent memory leak
+        clearInterval(cleanupInterval);
+
         if (pylsp) {
             pylsp.kill();
         }

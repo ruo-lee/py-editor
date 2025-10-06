@@ -187,13 +187,23 @@ export class EventManager {
         const { outputPanelClose, outputPanelResizer } = this.getElements();
 
         if (outputPanelClose) {
-            outputPanelClose.addEventListener('click', () => {
-                this.context.outputPanel.style.display = 'none';
+            outputPanelClose.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+
+                // Always collapse panel when close button is clicked
+                if (this.context.problemsManager) {
+                    this.context.problemsManager.collapsePanel();
+                }
             });
         }
 
         if (outputPanelResizer && this.context.outputPanel) {
-            this.context.setupOutputPanelResize(outputPanelResizer, this.context.outputPanel);
+            this.context.setupOutputPanelResize(
+                outputPanelResizer,
+                this.context.outputPanel,
+                this.context
+            );
         }
     }
 

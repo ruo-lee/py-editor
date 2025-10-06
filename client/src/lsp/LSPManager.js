@@ -219,33 +219,23 @@ export class LSPManager {
      * For stdlib files, skip didChange as LSP already knows them and they're read-only
      */
     async ensureDocumentSynchronized(filePath, content) {
-        // Skip didChange for stdlib files - LSP already knows them
-        if (
-            filePath.startsWith('/usr/local/lib/python3.11/') ||
-            filePath.startsWith('/usr/lib/python')
-        ) {
+        if (!this.context.lspClientInstance) {
             return;
         }
 
-        // Workspace file - send didChange
-        // Remove leading slash to avoid double slashes
-        const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-        const fileUri = `file:///app/workspace/${normalizedPath}`;
-        this.context.sendLSPRequest({
-            jsonrpc: '2.0',
-            method: 'textDocument/didChange',
-            params: {
-                textDocument: {
-                    uri: fileUri,
-                    version: Date.now(),
-                },
-                contentChanges: [
-                    {
-                        text: content,
-                    },
-                ],
-            },
-        });
+        // Skip for stdlib files - they are read-only
+        if (this.context.isStdlibFile(filePath)) {
+            return;
+        }
+
+        // Ensure document is opened first (LSPClient tracks this and avoids duplicates)
+        this.context.lspClientInstance.notifyDidOpen(filePath, content);
+
+        // Give LSP time to process the open (if it was just opened)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Send didChange to ensure LSP has latest content
+        this.context.lspClientInstance.notifyDidChange(filePath, content);
 
         // Give LSP time to process the change
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -288,7 +278,7 @@ export class LSPManager {
             return;
         }
 
-        // Delegate to LSPClient
+        // Delegate to LSPClient - it handles URI encoding and opened documents tracking
         if (this.context.lspClientInstance) {
             this.context.lspClientInstance.notifyDidOpen(filepath, content);
         }

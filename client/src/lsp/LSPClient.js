@@ -134,6 +134,17 @@ export class LSPClient {
      * Handle LSP server responses
      */
     handleResponse(response) {
+        // Handle notifications (no id)
+        if (!response.id && response.method) {
+            switch (response.method) {
+                case 'textDocument/publishDiagnostics':
+                    this.handlePublishDiagnostics(response);
+                    break;
+            }
+            return;
+        }
+
+        // Handle responses (with id)
         if (response.id && this.pendingRequests.has(response.id)) {
             const request = this.pendingRequests.get(response.id);
             this.pendingRequests.delete(response.id);
@@ -469,8 +480,13 @@ export class LSPClient {
                         // Handle both workspace and stdlib file URIs
                         let filePath;
                         if (location.uri.startsWith('file:///app/workspace/')) {
-                            // Workspace file - remove the workspace prefix
-                            filePath = location.uri.replace('file:///app/workspace/', '');
+                            // Workspace file - remove the workspace prefix and decode URI components
+                            const encodedPath = location.uri.replace('file:///app/workspace/', '');
+                            // Decode each path component to handle non-ASCII filenames (e.g., Korean)
+                            filePath = encodedPath
+                                .split('/')
+                                .map((component) => decodeURIComponent(component))
+                                .join('/');
                         } else if (location.uri.startsWith('file://')) {
                             // Other file (like stdlib) - remove file:// protocol
                             filePath = location.uri.replace('file://', '');
@@ -584,6 +600,18 @@ export class LSPClient {
 
         const fileUri = this.getFileUri(filePath);
 
+        // Track opened documents to avoid duplicate didOpen notifications
+        if (!this.openedDocuments) {
+            this.openedDocuments = new Set();
+        }
+
+        // Only send didOpen if not already opened
+        if (this.openedDocuments.has(fileUri)) {
+            return; // Already opened, skip
+        }
+
+        this.openedDocuments.add(fileUri);
+
         this.sendRequest({
             jsonrpc: '2.0',
             method: 'textDocument/didOpen',
@@ -653,6 +681,11 @@ export class LSPClient {
 
         const fileUri = this.getFileUri(filePath);
 
+        // Remove from opened documents tracking
+        if (this.openedDocuments) {
+            this.openedDocuments.delete(fileUri);
+        }
+
         this.sendRequest({
             jsonrpc: '2.0',
             method: 'textDocument/didClose',
@@ -680,7 +713,29 @@ export class LSPClient {
         // Workspace files: add /app/workspace/ prefix
         // Remove leading slash to avoid double slashes
         const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-        return `file:///app/workspace/${normalizedPath}`;
+
+        // Encode path components for LSP (needed for non-ASCII characters like Korean)
+        // LSP uses encoded URIs as document keys
+        // IMPORTANT: Only encode once - LSP expects URI-encoded format, not double-encoded
+        const encodedPath = normalizedPath
+            .split('/')
+            .map((component) => {
+                // Check if already encoded (to avoid double encoding)
+                try {
+                    const decoded = decodeURIComponent(component);
+                    // If decoding changes it, it's already encoded - use as is
+                    if (decoded !== component) {
+                        return component;
+                    }
+                } catch (e) {
+                    // Decoding failed, probably not encoded
+                }
+                // Not encoded - encode it now
+                return encodeURIComponent(component);
+            })
+            .join('/');
+
+        return `file:///app/workspace/${encodedPath}`;
     }
 
     /**
@@ -773,12 +828,275 @@ export class LSPClient {
     }
 
     /**
+     * Handle diagnostics from LSP server (type errors, syntax errors, etc.)
+     */
+    handlePublishDiagnostics(notification) {
+        const params = notification.params;
+        if (!params || !params.uri) return;
+
+        // Extract file path from URI
+        let filePath;
+        if (params.uri.startsWith('file:///app/workspace/')) {
+            const encodedPath = params.uri.replace('file:///app/workspace/', '');
+            filePath = encodedPath
+                .split('/')
+                .map((component) => decodeURIComponent(component))
+                .join('/');
+        } else if (params.uri.startsWith('file://')) {
+            filePath = params.uri.replace('file://', '');
+        } else {
+            filePath = params.uri;
+        }
+
+        // Get the Monaco model for this file
+        const modelUri = this.isStdlibFile(filePath)
+            ? monaco.Uri.parse(`stdlib://${filePath}`)
+            : monaco.Uri.file(filePath);
+        const model = monaco.editor.getModel(modelUri);
+
+        if (!model) {
+            // Model not found - might be closed or not yet created
+            return;
+        }
+
+        // Convert LSP diagnostics to Monaco markers
+        const markers = (params.diagnostics || []).map((diagnostic) => {
+            let startCol = diagnostic.range.start.character + 1;
+            let endCol = diagnostic.range.end.character + 1;
+            const lineNumber = diagnostic.range.start.line + 1;
+
+            // Fix marker range for specific error types
+            const model = monaco.editor.getModel(
+                this.isStdlibFile(filePath)
+                    ? monaco.Uri.parse(`stdlib://${filePath}`)
+                    : monaco.Uri.file(filePath)
+            );
+
+            if (model) {
+                const lineContent = model.getLineContent(lineNumber);
+
+                // For unused code warnings
+                if (this.isUnusedCodeMessage(diagnostic.message)) {
+                    const identifier = this.extractIdentifierFromMessage(diagnostic.message);
+
+                    if (identifier) {
+                        const identifierIndex = lineContent.indexOf(identifier);
+                        if (identifierIndex !== -1) {
+                            startCol = identifierIndex + 1;
+                            endCol = startCol + identifier.length;
+                        }
+                    }
+                }
+                // For mypy module not found errors
+                else if (
+                    diagnostic.source === 'mypy' &&
+                    diagnostic.message.includes('Cannot find implementation or library stub')
+                ) {
+                    const moduleMatch = diagnostic.message.match(/module named "([^"]+)"/);
+                    if (moduleMatch) {
+                        const moduleName = moduleMatch[1];
+                        const moduleIndex = lineContent.indexOf(moduleName);
+                        if (moduleIndex !== -1) {
+                            startCol = moduleIndex + 1;
+                            endCol = startCol + moduleName.length;
+                        }
+                    }
+                }
+            }
+
+            const marker = {
+                severity: this.convertDiagnosticSeverity(diagnostic.severity),
+                startLineNumber: lineNumber,
+                startColumn: startCol,
+                endLineNumber: diagnostic.range.end.line + 1,
+                endColumn: endCol,
+                message: diagnostic.message,
+                source: diagnostic.source || 'pylsp',
+            };
+
+            // Add tags if present (LSP DiagnosticTag: Unnecessary=1, Deprecated=2)
+            if (diagnostic.tags && diagnostic.tags.length > 0) {
+                marker.tags = diagnostic.tags;
+            } else if (this.isUnusedCodeMessage(diagnostic.message)) {
+                // Fallback: Detect unused code from message pattern
+                marker.tags = [1]; // DiagnosticTag.Unnecessary
+            }
+
+            return marker;
+        });
+
+        // Set markers on the model
+        monaco.editor.setModelMarkers(model, 'pylsp', markers);
+
+        // Apply unused code decorations
+        this.applyUnusedCodeDecorations(model, markers);
+
+        // Update Problems panel if available
+        if (this.onDiagnosticsUpdate) {
+            this.onDiagnosticsUpdate(filePath, markers);
+        }
+    }
+
+    /**
+     * Convert LSP diagnostic severity to Monaco marker severity
+     */
+    convertDiagnosticSeverity(severity) {
+        // LSP severity: 1=Error, 2=Warning, 3=Information, 4=Hint
+        switch (severity) {
+            case 1:
+                return monaco.MarkerSeverity.Error;
+            case 2:
+                return monaco.MarkerSeverity.Warning;
+            case 3:
+                return monaco.MarkerSeverity.Info;
+            case 4:
+                return monaco.MarkerSeverity.Hint;
+            default:
+                return monaco.MarkerSeverity.Error;
+        }
+    }
+
+    /**
+     * Check if diagnostic message indicates unused code
+     */
+    isUnusedCodeMessage(message) {
+        const unusedPatterns = [
+            /imported but unused/i,
+            /assigned to but never used/i,
+            /defined but never used/i,
+            /is assigned but never used/i,
+        ];
+        return unusedPatterns.some((pattern) => pattern.test(message));
+    }
+
+    /**
+     * Extract identifier from diagnostic message
+     */
+    extractIdentifierFromMessage(message) {
+        const patterns = [
+            { regex: /^'([^']+)\.([^']+)' imported but unused/, group: 2 }, // typing.List -> List
+            { regex: /^'([^']+\.\*)' imported but unused/, group: 1 }, // local_codes.*
+            { regex: /^'([^']+)' imported but unused/, group: 1 }, // os -> os
+            { regex: /^local variable '([^']+)' is assigned to but never used/, group: 1 }, // data
+        ];
+
+        for (const { regex, group } of patterns) {
+            const match = message.match(regex);
+            if (match) {
+                return match[group];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Apply unused code decorations (grayed out style like VSCode)
+     */
+    applyUnusedCodeDecorations(model, markers) {
+        // Filter markers with Unnecessary tag (tag=1)
+        const unusedMarkers = markers.filter(
+            (marker) => marker.tags && marker.tags.includes(1) // LSP DiagnosticTag.Unnecessary = 1
+        );
+
+        // Create decorations for unused code - apply opacity to specific word only
+        const decorations = unusedMarkers.map((marker) => {
+            const lineContent = model.getLineContent(marker.startLineNumber);
+
+            // Extract identifier from message: 'os' imported but unused -> os
+            let identifier = null;
+            const patterns = [
+                /^'([^']+)' imported but unused/,
+                /^'([^']+\.([^']+))' imported but unused/, // typing.List -> List
+                /^local variable '([^']+)' is assigned to but never used/,
+                /^'([^']+\.\*)' imported but unused/, // local_codes.*
+            ];
+
+            for (const pattern of patterns) {
+                const match = marker.message.match(pattern);
+                if (match) {
+                    identifier = match[2] || match[1]; // Use captured group 2 if exists (for typing.List)
+                    break;
+                }
+            }
+
+            if (!identifier) {
+                // Fallback to marker range
+                return {
+                    range: new monaco.Range(
+                        marker.startLineNumber,
+                        marker.startColumn,
+                        marker.endLineNumber,
+                        marker.endColumn
+                    ),
+                    options: {
+                        inlineClassName: 'unused-code',
+                        stickiness:
+                            monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+                    },
+                };
+            }
+
+            // Find identifier position in line
+            const identifierIndex = lineContent.indexOf(identifier);
+            if (identifierIndex === -1) {
+                // Not found, use marker range
+                return {
+                    range: new monaco.Range(
+                        marker.startLineNumber,
+                        marker.startColumn,
+                        marker.endLineNumber,
+                        marker.endColumn
+                    ),
+                    options: {
+                        inlineClassName: 'unused-code',
+                        stickiness:
+                            monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+                    },
+                };
+            }
+
+            // Create decoration for exact identifier position
+            const startCol = identifierIndex + 1;
+            const endCol = startCol + identifier.length;
+
+            return {
+                range: new monaco.Range(
+                    marker.startLineNumber,
+                    startCol,
+                    marker.endLineNumber,
+                    endCol
+                ),
+                options: {
+                    className: 'unused-code-decoration',
+                    inlineClassName: 'unused-code-inline',
+                    stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+                },
+            };
+        });
+
+        // Store decoration IDs per model to clean up later
+        if (!this.unusedDecorations) {
+            this.unusedDecorations = new Map();
+        }
+
+        // Clear old decorations for this model
+        const oldDecorations = this.unusedDecorations.get(model) || [];
+        const newDecorations = model.deltaDecorations(oldDecorations, decorations);
+        this.unusedDecorations.set(model, newDecorations);
+    }
+
+    /**
      * Disconnect from LSP server
      */
     disconnect() {
         if (this.languageClient) {
             this.languageClient.close();
             this.languageClient = null;
+        }
+
+        // Clear unused decorations
+        if (this.unusedDecorations) {
+            this.unusedDecorations.clear();
         }
     }
 }

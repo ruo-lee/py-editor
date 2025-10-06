@@ -9,44 +9,11 @@ export class ValidationManager {
     }
 
     setupBasicValidation() {
-        // Setup validation for the main editor
-        if (this.context.editor) {
-            this.context.editor.onDidChangeModelContent(() => {
-                const model = this.context.editor.getModel();
-                if (model) {
-                    const filepath = this.context.activeFile;
-                    if (filepath && this.context.openTabs.has(filepath)) {
-                        const tabData = this.context.openTabs.get(filepath);
-                        tabData.saved = false;
-                    }
-
-                    // LSP handles syntax checking automatically
-                }
-            });
-        }
-
-        // Register document formatting provider
-        monaco.languages.registerDocumentFormattingEditProvider('python', {
-            provideDocumentFormattingEdits: (model) => {
-                // Basic Python formatting
-                const value = model.getValue();
-                const lines = value.split('\\n');
-                const formatted = lines.map((line) => {
-                    // Basic indentation fixes
-                    return line.replace(/^\\s+/, (match) => {
-                        const spaces = match.length;
-                        const tabs = Math.floor(spaces / 4);
-                        return '    '.repeat(tabs);
-                    });
-                });
-
-                return [
-                    {
-                        range: model.getFullModelRange(),
-                        text: formatted.join('\\n'),
-                    },
-                ];
-            },
-        });
+        // NOTE: Content change tracking is now handled at MODEL level (in FileLoader)
+        // to prevent duplicate notifications when the same model is used in split editors.
+        // Saved state updates are also handled at model level.
+        // No editor-level listeners needed here anymore
+        // Note: Document formatting is now handled by LSPProviderManager
+        // which registers a provider that uses the Black formatter via LSP
     }
 }

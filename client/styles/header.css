@@ -73,3 +73,52 @@ body.light-theme .header-btn.active {
     background: rgba(0, 122, 204, 0.15);
     color: #005a9e;
 }
+
+/* Format button styling */
+.header-btn#formatBtn {
+    color: #4ec9b0; /* Teal for format action */
+}
+
+.header-btn#formatBtn:hover {
+    background: rgba(78, 201, 176, 0.2);
+    color: #6eddcb;
+}
+
+.header-btn#formatBtn.formatting {
+    background: rgba(78, 201, 176, 0.15);
+    color: #4ec9b0;
+}
+
+body.light-theme .header-btn#formatBtn {
+    color: #008080;
+}
+
+body.light-theme .header-btn#formatBtn:hover {
+    background: rgba(0, 128, 128, 0.15);
+    color: #006666;
+}
+
+/* Type check button styling */
+.header-btn#typeCheckBtn.active {
+    background: rgba(86, 156, 214, 0.2);
+    color: #569cd6;
+}
+
+body.light-theme .header-btn#typeCheckBtn.active {
+    background: rgba(0, 122, 204, 0.15);
+    color: #005a9e;
+}
+
+/* Loading animation for format button */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.codicon-modifier-spin {
+    animation: spin 1s linear infinite;
+}

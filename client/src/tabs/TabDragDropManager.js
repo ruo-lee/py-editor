@@ -110,12 +110,11 @@ export class TabDragDropManager {
         const isStdlib = filepath.startsWith('/usr/local/lib/python3.11/');
         targetTabManager.openTab(filepath, isStdlib);
 
-        // Set model on target editor
-        const targetEditorInstance =
-            toEditor === 'left' ? this.context.editor : this.context.rightEditor;
-        if (targetEditorInstance && tabData.model) {
-            targetEditorInstance.setModel(tabData.model);
-        }
+        // Note: No need to manually set model or notify LSP here
+        // The openTab() call above already triggers switchTab() which:
+        // 1. Sets the model on the editor
+        // 2. Notifies LSP about the opened document
+        // This prevents duplicate didOpen notifications
 
         // Update placeholder if moving to right editor
         if (toEditor === 'right' && this.context.splitViewManager?.updatePlaceholderVisibility) {
