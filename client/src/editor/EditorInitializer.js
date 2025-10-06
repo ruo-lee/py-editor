@@ -43,6 +43,67 @@ export class EditorInitializer {
 
         // Setup cursor position tracking for status bar
         this.setupCursorPositionTracking();
+
+        // Fix Find widget aria-hidden issue
+        this.setupFindWidgetFix();
+    }
+
+    setupFindWidgetFix() {
+        // Use MutationObserver to detect Find widget visibility
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                const target = mutation.target;
+
+                // Detect when Find widget becomes visible
+                if (target.classList && target.classList.contains('find-widget')) {
+                    const isVisible = target.classList.contains('visible');
+
+                    if (isVisible) {
+                        // Force release Ctrl key state when Find opens
+                        this.context.ctrlPressed = false;
+                        this.context.updateCursorStyle();
+                        this.context.clearLinkDecorations();
+
+                        // Prevent editor from stealing focus
+                        setTimeout(() => {
+                            const findInput = target.querySelector('.input, textarea');
+                            if (findInput) {
+                                findInput.focus();
+                            }
+                        }, 50);
+                    }
+
+                    // Remove aria-hidden to prevent accessibility issues
+                    if (target.getAttribute('aria-hidden') === 'true') {
+                        target.removeAttribute('aria-hidden');
+                    }
+                }
+            });
+        });
+
+        // Observe the editor container for Find widget
+        const editorContainer = document.querySelector('.editor-container');
+        if (editorContainer) {
+            observer.observe(editorContainer, {
+                attributes: true,
+                attributeFilter: ['class', 'aria-hidden'],
+                subtree: true,
+            });
+        }
+
+        // Also listen for Ctrl+F keydown to immediately release Ctrl state
+        this.context.editor.onKeyDown((e) => {
+            // Detect Ctrl+F or Cmd+F
+            const isFind = (this.context.isMac ? e.metaKey : e.ctrlKey) && e.code === 'KeyF';
+            if (isFind) {
+                // Immediately release Ctrl state
+                setTimeout(() => {
+                    this.context.ctrlPressed = false;
+                    this.context.updateCursorStyle();
+                    this.context.clearLinkDecorations();
+                }, 10);
+            }
+        });
     }
 
     showWelcomePage() {
@@ -100,6 +161,11 @@ export class EditorInitializer {
     setupEditorEventHandlers() {
         // Handle Ctrl+Click for go-to-definition manually
         this.context.editor.onMouseDown(async (e) => {
+            // Ignore if clicking on Monaco widgets (Find, Replace, etc.)
+            if (this.isMonacoWidgetTarget(e.event.target)) {
+                return;
+            }
+
             const isModifierPressed = this.context.isMac ? e.event.metaKey : e.event.ctrlKey;
 
             if (isModifierPressed && e.target.position) {
@@ -164,6 +230,11 @@ export class EditorInitializer {
         this.context.isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
         document.addEventListener('keydown', (e) => {
+            // Ignore if Find widget or any Monaco widget is focused
+            if (this.isMonacoWidgetFocused(e.target)) {
+                return;
+            }
+
             // Check if Ctrl (or Cmd on Mac) key is pressed
             if (this.context.isMac && e.key === 'Meta') {
                 this.context.ctrlPressed = true;
@@ -175,6 +246,11 @@ export class EditorInitializer {
         });
 
         document.addEventListener('keyup', (e) => {
+            // Ignore if Find widget or any Monaco widget is focused
+            if (this.isMonacoWidgetFocused(e.target)) {
+                return;
+            }
+
             // Check if Ctrl (or Cmd on Mac) key is released
             if (this.context.isMac && e.key === 'Meta') {
                 this.context.ctrlPressed = false;
@@ -186,6 +262,53 @@ export class EditorInitializer {
                 this.context.clearLinkDecorations();
             }
         });
+    }
+
+    isMonacoWidgetFocused(target) {
+        // Check if the focused element is inside a Monaco widget (Find, Replace, etc.)
+        if (!target) return false;
+
+        // Check if target or any parent has Monaco widget classes
+        let element = target;
+        while (element && element !== document.body) {
+            const classList = element.classList;
+            if (
+                classList &&
+                (classList.contains('find-widget') ||
+                    classList.contains('monaco-inputbox') ||
+                    classList.contains('monaco-findInput') ||
+                    classList.contains('input') ||
+                    element.tagName === 'TEXTAREA' ||
+                    element.tagName === 'INPUT')
+            ) {
+                return true;
+            }
+            element = element.parentElement;
+        }
+        return false;
+    }
+
+    isMonacoWidgetTarget(target) {
+        // Check if the clicked target is part of a Monaco widget
+        if (!target) return false;
+
+        let element = target;
+        while (element && element !== document.body) {
+            const classList = element.classList;
+            if (
+                classList &&
+                (classList.contains('find-widget') ||
+                    classList.contains('editor-widget') ||
+                    classList.contains('monaco-inputbox') ||
+                    classList.contains('monaco-findInput') ||
+                    classList.contains('button') ||
+                    classList.contains('monaco-action-bar'))
+            ) {
+                return true;
+            }
+            element = element.parentElement;
+        }
+        return false;
     }
 
     setupContentChangeTracking() {

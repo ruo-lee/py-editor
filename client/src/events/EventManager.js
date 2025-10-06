@@ -211,10 +211,18 @@ export class EventManager {
      * Setup editor focus listeners
      */
     setupEditorFocusListeners() {
-        // Focus editor when clicking on editor area
+        // Focus editor when clicking on editor area (except Monaco widgets)
         const editorContainer = document.querySelector('.editor-container');
         if (editorContainer) {
-            editorContainer.addEventListener('click', () => {
+            editorContainer.addEventListener('click', (e) => {
+                // Don't focus editor if clicking on Monaco widgets (find, context menu, etc.)
+                if (
+                    e.target.closest(
+                        '.monaco-editor-overlaymessage, .find-widget, .monaco-menu, .monaco-contextmenu, .monaco-inputbox, .suggest-widget, .parameter-hints-widget, .quick-input-widget'
+                    )
+                ) {
+                    return;
+                }
                 if (this.context.editor) {
                     this.context.editor.focus();
                 }
@@ -226,7 +234,15 @@ export class EventManager {
             '#rightEditorContainer .editor-container'
         );
         if (rightEditorContainer) {
-            rightEditorContainer.addEventListener('click', () => {
+            rightEditorContainer.addEventListener('click', (e) => {
+                // Don't focus editor if clicking on Monaco widgets
+                if (
+                    e.target.closest(
+                        '.monaco-editor-overlaymessage, .find-widget, .monaco-menu, .monaco-contextmenu, .monaco-inputbox, .suggest-widget, .parameter-hints-widget, .quick-input-widget'
+                    )
+                ) {
+                    return;
+                }
                 if (this.context.rightEditor) {
                     this.context.rightEditor.focus();
                 }
