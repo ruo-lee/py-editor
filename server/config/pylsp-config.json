@@ -1,0 +1,33 @@
+{
+    "plugins": {
+        "black": {
+            "enabled": true,
+            "line_length": 88,
+            "cache_config": true
+        },
+        "pylsp_mypy": {
+            "enabled": true,
+            "live_mode": false,
+            "strict": false,
+            "dmypy": false
+        },
+        "pyflakes": {
+            "enabled": true
+        },
+        "pycodestyle": {
+            "enabled": false
+        },
+        "autopep8": {
+            "enabled": false
+        },
+        "yapf": {
+            "enabled": false
+        },
+        "rope_completion": {
+            "enabled": false
+        },
+        "rope_autoimport": {
+            "enabled": false
+        }
+    }
+}

@@ -1,0 +1,537 @@
+/* Template Selector Panel - Modern & Trendy Design */
+
+/* Panel Overlay with Blur */
+.template-selector-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+body.light-theme .template-selector-panel {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+/* Main Container with Modern Gradient */
+.template-selector-container {
+    position: relative;
+    width: 92%;
+    max-width: 1100px;
+    height: 85%;
+    max-height: 750px;
+    background: linear-gradient(145deg, #2a2a2e 0%, #1e1e1e 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUp 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+body.light-theme .template-selector-container {
+    background: linear-gradient(145deg, #ffffff 0%, #fafbfc 100%);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.03) inset;
+}
+
+/* Close Button - Simple Design */
+.template-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+}
+
+.template-close-btn:hover {
+    color: #ffffff;
+    transform: rotate(90deg);
+}
+
+.template-close-btn:active {
+    transform: rotate(90deg) scale(0.9);
+}
+
+body.light-theme .template-close-btn {
+    color: rgba(0, 0, 0, 0.4);
+}
+
+body.light-theme .template-close-btn:hover {
+    color: #000000;
+}
+
+.template-close-btn i {
+    font-size: 20px;
+}
+
+/* Header Section - Simple & Clean */
+.template-selector-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 64px 24px 32px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body.light-theme .template-selector-header {
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+.template-filetype-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+}
+
+.template-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(204, 204, 204, 0.6);
+}
+
+body.light-theme .template-label {
+    color: rgba(97, 97, 97, 0.6);
+}
+
+.template-filetype-select {
+    padding: 5px 8px 5px 10px;
+    background-color: rgba(60, 60, 60, 0.5);
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 2px;
+    color: #cccccc;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23cccccc' d='M11.5 6.5L8 10 4.5 6.5l.707-.707L8 8.586l2.793-2.793z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 4px center;
+    background-size: 16px 16px;
+    padding-right: 24px;
+}
+
+.template-filetype-select:hover {
+    background-color: rgba(90, 93, 94, 0.5);
+    border-color: rgba(128, 128, 128, 0.5);
+}
+
+.template-filetype-select:focus {
+    outline: none;
+    border-color: #007fd4;
+    background-color: rgba(0, 127, 212, 0.1);
+}
+
+body.light-theme .template-filetype-select {
+    background-color: rgba(255, 255, 255, 0.9);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23616161' d='M11.5 6.5L8 10 4.5 6.5l.707-.707L8 8.586l2.793-2.793z'/%3E%3C/svg%3E");
+    border-color: rgba(128, 128, 128, 0.25);
+    color: #616161;
+}
+
+body.light-theme .template-filetype-select:hover {
+    background-color: rgba(243, 243, 243, 1);
+    border-color: rgba(128, 128, 128, 0.35);
+}
+
+.template-filename-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.template-input-group {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.template-filename-label {
+    display: none;
+}
+
+.template-filename-input {
+    flex: 1;
+    padding: 5px 10px;
+    background: rgba(60, 60, 60, 0.5);
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 2px;
+    color: #cccccc;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-weight: 400;
+    outline: none;
+    transition: all 0.1s ease;
+}
+
+.template-filename-input:hover {
+    background-color: rgba(90, 93, 94, 0.5);
+    border-color: rgba(128, 128, 128, 0.5);
+}
+
+.template-filename-input:focus {
+    border-color: #007fd4;
+    background-color: rgba(0, 127, 212, 0.1);
+}
+
+body.light-theme .template-filename-input {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(128, 128, 128, 0.25);
+    color: #616161;
+}
+
+body.light-theme .template-filename-input:hover {
+    background-color: rgba(243, 243, 243, 1);
+    border-color: rgba(128, 128, 128, 0.35);
+}
+
+body.light-theme .template-filename-input:focus {
+    border-color: #007fd4;
+    background-color: rgba(0, 127, 212, 0.05);
+}
+
+.template-filename-input::placeholder {
+    color: rgba(204, 204, 204, 0.5);
+}
+
+body.light-theme .template-filename-input::placeholder {
+    color: rgba(97, 97, 97, 0.5);
+}
+
+/* VSCode-Style Create Button */
+.template-create-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 5px 14px;
+    background: transparent;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 2px;
+    color: #cccccc;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    white-space: nowrap;
+}
+
+.template-create-btn:hover {
+    background: rgba(90, 93, 94, 0.5);
+    border-color: rgba(128, 128, 128, 0.5);
+}
+
+.template-create-btn:active {
+    background: rgba(128, 128, 128, 0.3);
+}
+
+body.light-theme .template-create-btn {
+    background: transparent;
+    border-color: rgba(128, 128, 128, 0.25);
+    color: #616161;
+}
+
+body.light-theme .template-create-btn:hover {
+    background: rgba(243, 243, 243, 1);
+    border-color: rgba(128, 128, 128, 0.35);
+}
+
+body.light-theme .template-create-btn:active {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.template-create-btn i {
+    font-size: 16px;
+}
+
+/* Body Section */
+.template-selector-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 0;
+    overflow: hidden;
+}
+
+/* Template List Section with Card Design */
+.template-list-section {
+    display: flex;
+    flex-direction: column;
+    background: rgba(37, 37, 38, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.template-list-section.hidden {
+    display: none;
+}
+
+body.light-theme .template-list-section {
+    background: rgba(243, 243, 243, 0.5);
+    border-right-color: rgba(0, 0, 0, 0.06);
+}
+
+.template-list-header {
+    padding: 16px 20px;
+    background: rgba(45, 45, 48, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+body.light-theme .template-list-header {
+    background: rgba(232, 232, 232, 0.5);
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+    color: rgba(0, 0, 0, 0.5);
+}
+
+.template-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+/* VSCode-Style Template Items */
+.template-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    margin: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: rgba(204, 204, 204, 0.9);
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+    position: relative;
+    height: 22px;
+    line-height: 22px;
+}
+
+body.light-theme .template-item {
+    color: rgba(97, 97, 97, 0.9);
+}
+
+.template-item:hover {
+    background: rgba(90, 93, 94, 0.31);
+}
+
+body.light-theme .template-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.template-item.selected {
+    background: rgba(90, 93, 94, 0.7);
+    color: #ffffff;
+}
+
+body.light-theme .template-item.selected {
+    background: rgba(0, 0, 0, 0.08);
+    color: #000000;
+}
+
+.template-item-icon {
+    font-size: 16px;
+    color: rgba(204, 204, 204, 0.6);
+    transition: none;
+    flex-shrink: 0;
+}
+
+.template-item.selected .template-item-icon {
+    color: #ffffff;
+}
+
+body.light-theme .template-item-icon {
+    color: rgba(97, 97, 97, 0.6);
+}
+
+body.light-theme .template-item.selected .template-item-icon {
+    color: #000000;
+}
+
+.template-item-name {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Preview Section - VSCode Style */
+.template-preview-section {
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.template-preview-section.full-width {
+    grid-column: 1 / -1;
+}
+
+.template-preview-header {
+    padding: 8px 12px;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(204, 204, 204, 0.6);
+}
+
+body.light-theme .template-preview-header {
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+    color: rgba(97, 97, 97, 0.6);
+}
+
+.template-preview {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: #1e1e1e;
+}
+
+body.light-theme .template-preview {
+    background: #ffffff;
+}
+
+/* Modern Scrollbar */
+.template-list::-webkit-scrollbar,
+.template-preview::-webkit-scrollbar {
+    width: 8px;
+}
+
+.template-list::-webkit-scrollbar-track,
+.template-preview::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.template-list::-webkit-scrollbar-thumb,
+.template-preview::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+body.light-theme .template-list::-webkit-scrollbar-thumb,
+body.light-theme .template-preview::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.template-list::-webkit-scrollbar-thumb:hover,
+.template-preview::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+body.light-theme .template-list::-webkit-scrollbar-thumb:hover,
+body.light-theme .template-preview::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .template-selector-container {
+        width: 96%;
+        height: 90%;
+        border-radius: 16px;
+    }
+
+    .template-close-btn {
+        top: 12px;
+        right: 12px;
+    }
+
+    .template-selector-header {
+        padding: 20px 24px;
+    }
+
+    .template-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .template-create-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .template-selector-body {
+        grid-template-columns: 1fr;
+    }
+
+    .template-list-section {
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        max-height: 180px;
+    }
+
+    body.light-theme .template-list-section {
+        border-bottom-color: rgba(0, 0, 0, 0.06);
+    }
+}
+
+/* Loading State Animation */
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}

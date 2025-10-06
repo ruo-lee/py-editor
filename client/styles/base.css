@@ -1,0 +1,142 @@
+/* Global reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    overflow: hidden;
+}
+
+#app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* Sidebar (Explorer) */
+.main-content > .sidebar {
+    width: 250px;
+    min-width: 200px;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #3c3c3c;
+    position: relative;
+}
+
+/* Right workspace (Editor + Bottom Panel) */
+.main-content > .editor-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0; /* Enable proper flex shrinking */
+    height: 100%; /* Explicit height for flex calculation */
+}
+
+/* Editor area takes remaining space after panel */
+.editor-workspace > .editor-area {
+    flex: 1 1 0 !important; /* Force flex to always use remaining space */
+    display: flex;
+    overflow: hidden;
+    min-height: 0; /* Allow flex item to shrink */
+    max-height: 100%; /* Prevent overflow */
+    position: relative; /* For proper layout calculation */
+}
+
+/* When collapsed, show only header */
+.editor-workspace > .output-panel.collapsed {
+    height: 30px !important;
+    overflow: hidden;
+}
+
+/* Status bar at the bottom */
+.status-bar {
+    height: 22px;
+    background: #1e1e1e;
+    color: #cccccc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 12px;
+    border-top: 1px solid #2d2d2d;
+}
+
+.status-bar-left,
+.status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    cursor: default;
+    transition: background 0.1s;
+}
+
+.status-item i {
+    font-size: 14px;
+}
+
+.status-item.separator {
+    color: #606060;
+    padding: 0 2px;
+}
+
+.status-item.user-id,
+.status-item.lsp-status {
+    cursor: pointer;
+}
+
+.status-item.user-id:hover,
+.status-item.lsp-status:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.version-badge {
+    font-weight: 500;
+    color: #cccccc;
+}
+
+/* LSP Status colors */
+.lsp-status.connected {
+    color: #4ec9b0;
+}
+
+.lsp-status.disconnected {
+    color: #f48771;
+}
+
+.lsp-status.connecting {
+    color: #dcdcaa;
+}
+
+/* Common utilities */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100px;
+    color: #858585;
+}
+
+.error {
+    color: #f14c4c;
+    padding: 10px;
+}
